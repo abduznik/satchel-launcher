@@ -1,0 +1,39 @@
+name: project_indie
+description: A portable offline-first DRM-free game launcher.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+  dio: ^5.4.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.2
+  jni: 1.0.0
+  path: ^1.8.3
+  encrypt: ^5.0.3
+  pointycastle: ^3.7.3
+  crypto: ^3.0.3
+  uuid: ^4.2.1
+  collection: ^1.18.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  build_runner: ^2.4.7
+  riverpod_generator: ^2.3.9
+  hive_generator: ^2.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+    - thirdparty/

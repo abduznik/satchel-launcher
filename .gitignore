@@ -1,0 +1,40 @@
+# Project Indie
+
+# Build outputs
+/build/
+*.iml
+.idea/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+flutter_*.log
+
+# Games folders (user content, never commit)
+Games/
+H:/Games/
+H:\Games\
+
+# OmniSave runtime copies
+*.OmniSave.exe
+OmniSave.ini
+
+# Encrypted keys (user secrets)
+keys.enc
+
+# Platform-specific
+/android/
+/ios/
+/linux/
+/macos/
+/web/
+/windows/
+
+# Hive
+*.hive
+*.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
