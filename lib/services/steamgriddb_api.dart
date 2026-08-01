@@ -36,6 +36,23 @@ class SteamGridDbApi {
     }
   }
 
+  /// Validates the API key by making a lightweight test request.
+  /// Returns true if the key is valid, false otherwise.
+  Future<bool> validate(String key) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/search/games/term/test',
+        options: Options(
+          headers: {'Authorization': 'Bearer $key'},
+        ),
+      );
+      // 200 = valid key, 401/403 = invalid
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<String?> getCoverUrl(String gameId) async {
     if (_apiKey == null || _apiKey!.isEmpty) return null;
 

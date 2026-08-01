@@ -46,6 +46,25 @@ class ScreenScraperApi {
     }
   }
 
+  /// Validates credentials by making a lightweight test request.
+  /// Returns true if the credentials are valid, false otherwise.
+  Future<bool> validate(String username, String password) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/jeuRecherche.php',
+        queryParameters: {
+          'output': 'json',
+          'devid': username,
+          'devpassword': password,
+          'recherche': 'test',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<String?> getCoverUrl(String gameId) async {
     try {
       final response = await _dio.get(

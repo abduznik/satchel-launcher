@@ -35,6 +35,31 @@ class ApiConfigNotifier extends StateNotifier<ApiConfig> {
     }
   }
 
+  // --- Validation methods ---
+
+  /// Validates a SteamGridDB API key by making a test request.
+  Future<bool> validateSteamGridDbKey(String key) async {
+    if (key.trim().isEmpty) return false;
+    final api = SteamGridDbApi();
+    return api.validate(key.trim());
+  }
+
+  /// Validates IGDB credentials by attempting authentication.
+  Future<bool> validateIgdbCredentials(String clientId, String clientSecret) async {
+    if (clientId.trim().isEmpty || clientSecret.trim().isEmpty) return false;
+    final api = IgdbApi();
+    return api.validate(clientId.trim(), clientSecret.trim());
+  }
+
+  /// Validates ScreenScraper credentials by making a test request.
+  Future<bool> validateScreenScraperCredentials(String username, String password) async {
+    if (username.trim().isEmpty || password.trim().isEmpty) return false;
+    final api = ScreenScraperApi();
+    return api.validate(username.trim(), password.trim());
+  }
+
+  // --- Update methods (save without validation, called after validation passes) ---
+
   Future<void> updateSteamGridDbKey(String? key) async {
     state = state.copyWith(
       steamGridDbKey: key,

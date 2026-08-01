@@ -238,66 +238,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showSteamGridDbDialog() {
     final controller = TextEditingController();
-    _showApiKeyDialog('SteamGridDB API Key', controller,
-        () => ref.read(apiConfigProvider.notifier).updateSteamGridDbKey(controller.text));
+    _showValidatedApiKeyDialog(
+      title: 'SteamGridDB API Key',
+      controller: controller,
+      hint: 'Enter your API key',
+      obscure: true,
+      validator: (value) =>
+          ref.read(apiConfigProvider.notifier).validateSteamGridDbKey(value),
+      onSave: (value) =>
+          ref.read(apiConfigProvider.notifier).updateSteamGridDbKey(value),
+    );
   }
 
   void _showIgdbDialog() {
     final client = TextEditingController();
     final secret = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => _StyledDialog(
-        title: 'IGDB Credentials',
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _DialogField(controller: client, hint: 'Client ID'),
-            const SizedBox(height: 12),
-            _DialogField(controller: secret, hint: 'Client Secret', obscure: true),
-          ],
-        ),
-        onSave: () {
-          ref.read(apiConfigProvider.notifier).updateIgdbCredentials(client.text, secret.text);
-          Navigator.pop(ctx);
-        },
-        onCancel: () => Navigator.pop(ctx),
-      ),
+    _showValidatedMultiFieldDialog(
+      title: 'IGDB Credentials',
+      fields: [
+        _DialogFieldData(controller: client, hint: 'Client ID'),
+        _DialogFieldData(controller: secret, hint: 'Client Secret', obscure: true),
+      ],
+      validator: () => ref
+          .read(apiConfigProvider.notifier)
+          .validateIgdbCredentials(client.text, secret.text),
+      onSave: () => ref
+          .read(apiConfigProvider.notifier)
+          .updateIgdbCredentials(client.text, secret.text),
     );
   }
 
   void _showScreenScraperDialog() {
     final user = TextEditingController();
     final pass = TextEditingController();
+    _showValidatedMultiFieldDialog(
+      title: 'ScreenScraper Credentials',
+      fields: [
+        _DialogFieldData(controller: user, hint: 'Username'),
+        _DialogFieldData(controller: pass, hint: 'Password', obscure: true),
+      ],
+      validator: () => ref
+          .read(apiConfigProvider.notifier)
+          .validateScreenScraperCredentials(user.text, pass.text),
+      onSave: () => ref
+          .read(apiConfigProvider.notifier)
+          .updateScreenScraperCredentials(user.text, pass.text),
+    );
+  }
+
+  void _showValidatedApiKeyDialog({
+    required String title,
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required Future<bool> Function(String) validator,
+    required void Function(String) onSave,
+  }) {
     showDialog(
       context: context,
-      builder: (ctx) => _StyledDialog(
-        title: 'ScreenScraper Credentials',
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _DialogField(controller: user, hint: 'Username'),
-            const SizedBox(height: 12),
-            _DialogField(controller: pass, hint: 'Password', obscure: true),
-          ],
-        ),
-        onSave: () {
-          ref.read(apiConfigProvider.notifier).updateScreenScraperCredentials(user.text, pass.text);
-          Navigator.pop(ctx);
-        },
-        onCancel: () => Navigator.pop(ctx),
+      builder: (ctx) => _ValidatedDialog(
+        title: title,
+        fields: [_DialogFieldData(controller: controller, hint: hint, obscure: obscure)],
+        validator: () => validator(controller.text.trim()),
+        onSave: () => onSave(controller.text.trim()),
       ),
     );
   }
 
-  void _showApiKeyDialog(String title, TextEditingController controller, VoidCallback onSave) {
+  void _showValidatedMultiFieldDialog({
+    required String title,
+    required List<_DialogFieldData> fields,
+    required Future<bool> Function() validator,
+    required VoidCallback onSave,
+  }) {
     showDialog(
       context: context,
-      builder: (ctx) => _StyledDialog(
+      builder: (ctx) => _ValidatedDialog(
         title: title,
-        content: _DialogField(controller: controller, hint: 'Enter your API key', obscure: true),
-        onSave: () { onSave(); Navigator.pop(ctx); },
-        onCancel: () => Navigator.pop(ctx),
+        fields: fields,
+        validator: validator,
+        onSave: onSave,
       ),
     );
   }
@@ -872,6 +892,128 @@ class _SidebarBackState extends ConsumerState<_SidebarBack> {
               size: 20,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Validated dialog ──────────────────────────────────────────────────────────
+
+class _DialogFieldData {
+  final TextEditingController controller;
+  final String hint;
+  final bool obscure;
+
+  _DialogFieldData({required this.controller, required this.hint, this.obscure = false});
+}
+
+class _ValidatedDialog extends ConsumerStatefulWidget {
+  final String title;
+  final List<_DialogFieldData> fields;
+  final Future<bool> Function() validator;
+  final VoidCallback onSave;
+
+  const _ValidatedDialog({
+    required this.title,
+    required this.fields,
+    required this.validator,
+    required this.onSave,
+  });
+
+  @override
+  ConsumerState<_ValidatedDialog> createState() => _ValidatedDialogState();
+}
+
+class _ValidatedDialogState extends ConsumerState<_ValidatedDialog> {
+  bool _validating = false;
+  String? _error;
+
+  Future<void> _validateAndSave() async {
+    setState(() {
+      _validating = true;
+      _error = null;
+    });
+
+    try {
+      final valid = await widget.validator();
+      if (!mounted) return;
+
+      if (!valid) {
+        setState(() {
+          _validating = false;
+          _error = 'Invalid credentials. Please check and try again.';
+        });
+        return;
+      }
+
+      widget.onSave();
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _validating = false;
+        _error = 'Validation failed. Check your connection.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            const SizedBox(height: 20),
+            for (final field in widget.fields) ...[
+              _DialogField(controller: field.controller, hint: field.hint, obscure: field.obscure),
+              const SizedBox(height: 12),
+            ],
+            if (_error != null) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, size: 16, color: cs.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(_error!,
+                          style: TextStyle(fontSize: 12, color: cs.error)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _validating ? null : () => Navigator.pop(context),
+                  child: Text('Cancel',
+                      style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5))),
+                ),
+                const SizedBox(width: 8),
+                _SmallButton(
+                  label: _validating ? 'Validating...' : 'Save',
+                  onTap: _validating ? () {} : _validateAndSave,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

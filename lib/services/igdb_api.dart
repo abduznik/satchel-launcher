@@ -28,6 +28,25 @@ class IgdbApi {
     }
   }
 
+  /// Validates credentials by attempting to authenticate with Twitch.
+  /// Returns true if the credentials are valid, false otherwise.
+  Future<bool> validate(String clientId, String clientSecret) async {
+    try {
+      final response = await _dio.post(
+        'https://id.twitch.tv/oauth2/token',
+        queryParameters: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'grant_type': 'client_credentials',
+        },
+      );
+      return response.statusCode == 200 &&
+          response.data['access_token'] != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool get isAuthenticated => _accessToken != null && _clientId != null;
 
   Options get _headers => Options(
