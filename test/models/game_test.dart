@@ -264,4 +264,46 @@ void main() {
       expect(video.videoId, '');
     });
   });
+
+  group('Game.displayName', () {
+    Game makeGame({String? customName, String? scrapedName}) => Game(
+      id: 'id',
+      name: 'Folder Name',
+      customName: customName,
+      folderPath: '/f',
+      exePath: '/f/e.exe',
+      metadata: GameMetadata(name: scrapedName),
+    );
+
+    test('falls back to folder name when nothing else set', () {
+      expect(makeGame().displayName, 'Folder Name');
+    });
+
+    test('uses scraped metadata name over folder name', () {
+      final game = makeGame(scrapedName: 'Deadpool');
+      expect(game.displayName, 'Deadpool');
+    });
+
+    test('manual override beats scraped name', () {
+      final game = makeGame(customName: 'DP (2013)', scrapedName: 'Deadpool');
+      expect(game.displayName, 'DP (2013)');
+    });
+
+    test('manual override beats folder name when no metadata', () {
+      final game = makeGame(customName: 'Custom Title');
+      expect(game.displayName, 'Custom Title');
+    });
+
+    test('blank manual override falls back to scraped', () {
+      final game = makeGame(customName: '   ', scrapedName: 'Deadpool');
+      expect(game.displayName, 'Deadpool');
+    });
+
+    test('customName survives storage JSON roundtrip', () {
+      final game = makeGame(customName: 'Renamed', scrapedName: 'Original');
+      final restored = Game.fromStorageJson(game.toStorageJson());
+      expect(restored.customName, 'Renamed');
+      expect(restored.displayName, 'Renamed');
+    });
+  });
 }

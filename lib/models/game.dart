@@ -2,7 +2,8 @@ import '../services/drive_service.dart';
 
 class Game {
   final String id;
-  final String name;
+  final String name;          // Folder name — always the source of truth for identity
+  final String? customName;   // Manually overridden display title (from editor)
   final String folderPath;   // Always absolute at runtime
   final String exePath;      // Always absolute at runtime
   final String? coverPath;   // Always absolute at runtime
@@ -14,6 +15,7 @@ class Game {
   Game({
     required this.id,
     required this.name,
+    this.customName,
     required this.folderPath,
     required this.exePath,
     this.coverPath,
@@ -23,11 +25,21 @@ class Game {
     this.omniSaveEnabled = true,
   }) : lastPlayed = lastPlayed ?? DateTime.now();
 
+  /// The title shown in the UI: manual override → scraped name → folder name.
+  String get displayName {
+    final custom = customName?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
+    final scraped = metadata?.name?.trim();
+    if (scraped != null && scraped.isNotEmpty) return scraped;
+    return name;
+  }
+
   // ── Runtime JSON (used in-memory, all absolute paths) ──────────────────
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'customName': customName,
     'folderPath': folderPath,
     'exePath': exePath,
     'coverPath': coverPath,
@@ -40,6 +52,7 @@ class Game {
   factory Game.fromJson(Map<String, dynamic> json) => Game(
     id: json['id'],
     name: json['name'],
+    customName: json['customName'],
     folderPath: json['folderPath'],
     exePath: json['exePath'],
     coverPath: json['coverPath'],
@@ -60,6 +73,7 @@ class Game {
   Map<String, dynamic> toStorageJson() => {
     'id': id,
     'name': name,
+    'customName': customName,
     'folderPath': DriveService.toPortable(folderPath),
     'exePath': DriveService.toPortable(exePath),
     'coverPath': coverPath != null ? DriveService.toPortable(coverPath!) : null,
@@ -76,6 +90,7 @@ class Game {
     return Game(
       id: json['id'],
       name: json['name'],
+      customName: json['customName'],
       folderPath: _resolveStoredPath(json['folderPath']),
       exePath: _resolveStoredPath(json['exePath']),
       coverPath: json['coverPath'] != null
@@ -103,6 +118,7 @@ class Game {
 
   Game copyWith({
     String? name,
+    String? customName,
     String? coverPath,
     String? bannerPath,
     GameMetadata? metadata,
@@ -112,6 +128,7 @@ class Game {
     return Game(
       id: id,
       name: name ?? this.name,
+      customName: customName ?? this.customName,
       folderPath: folderPath,
       exePath: exePath,
       coverPath: coverPath ?? this.coverPath,
@@ -124,6 +141,7 @@ class Game {
 }
 
 class GameMetadata {
+  final String? name;       // Scraped title from the metadata source (IGDB etc.)
   final String? summary;
   final List<String> genres;
   final String? releaseDate;
@@ -139,6 +157,7 @@ class GameMetadata {
   final bool autoScanned;
 
   GameMetadata({
+    this.name,
     this.summary,
     this.genres = const [],
     this.releaseDate,
@@ -155,6 +174,7 @@ class GameMetadata {
   });
 
   Map<String, dynamic> toJson() => {
+    'name': name,
     'summary': summary,
     'genres': genres,
     'releaseDate': releaseDate,
@@ -171,6 +191,7 @@ class GameMetadata {
   };
 
   factory GameMetadata.fromJson(Map<String, dynamic> json) => GameMetadata(
+    name: json['name'],
     summary: json['summary'],
     genres: List<String>.from(json['genres'] ?? []),
     releaseDate: json['releaseDate'],
@@ -189,6 +210,7 @@ class GameMetadata {
   );
 
   GameMetadata copyWith({
+    String? name,
     String? summary,
     List<String>? genres,
     String? releaseDate,
@@ -204,6 +226,7 @@ class GameMetadata {
     bool? autoScanned,
   }) {
     return GameMetadata(
+      name: name ?? this.name,
       summary: summary ?? this.summary,
       genres: genres ?? this.genres,
       releaseDate: releaseDate ?? this.releaseDate,

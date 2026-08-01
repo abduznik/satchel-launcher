@@ -127,7 +127,7 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                           ),
                         ),
                       )
-                    : _Placeholder(name: game.name),
+                    : _Placeholder(name: game.displayName),
 
                 // ── Bottom gradient (always) ─────────
                 const DecoratedBox(
@@ -248,7 +248,7 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          game.name,
+                          game.displayName,
                           style: TextStyle(
                             color: isThisGamePlaying
                                 ? const Color(0xFF22C55E)

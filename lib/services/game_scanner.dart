@@ -53,6 +53,7 @@ class GameScanner {
     // Check for .indie metadata
     final metaFile = File(p.join(folderPath, '.indie', 'meta.json'));
     GameMetadata? metadata;
+    String? customName;
     String? savedCoverPath;
 
     String? savedBannerPath;
@@ -61,6 +62,7 @@ class GameScanner {
         final json = await metaFile.readAsString();
         final data = _parseJson(json);
         metadata = GameMetadata.fromJson(data);
+        customName = data['customName'] as String?;
         savedCoverPath = data['coverPath'] as String?;
         savedBannerPath = data['bannerPath'] as String?;
         print('[GameScanner] Loaded metadata for $folderName: '
@@ -114,6 +116,7 @@ class GameScanner {
     return Game(
       id: _generateId(folderPath),
       name: folderName,
+      customName: customName,
       folderPath: folderPath,
       exePath: exePath,
       coverPath: coverPath,

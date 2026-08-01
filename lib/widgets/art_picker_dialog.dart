@@ -31,7 +31,7 @@ class _ArtPickerDialogState extends ConsumerState<ArtPickerDialog> {
   @override
   void initState() {
     super.initState();
-    _searchController.text = widget.game.name;
+    _searchController.text = widget.game.displayName;
     // Auto-search on open
     WidgetsBinding.instance.addPostFrameCallback((_) => _search());
   }

@@ -166,7 +166,7 @@ class MetadataFetchService {
     // If cover still null try SteamGridDB
     if (coverPath == null && steamGridDb != null) {
       try {
-        final sgResults = await steamGridDb!.search(game.name);
+        final sgResults = await steamGridDb!.search(game.displayName);
         if (sgResults.isNotEmpty) {
           final url = await steamGridDb!.getCoverUrl(sgResults.first.id);
           if (url != null) {
@@ -196,24 +196,24 @@ class MetadataFetchService {
 
     if (steamGridDb != null) {
       try {
-        final results = await steamGridDb!.search(game.name);
+        final results = await steamGridDb!.search(game.displayName);
         if (results.isNotEmpty) {
           coverUrl = await steamGridDb!.getCoverUrl(results.first.id);
         }
       } catch (e) {
-        print('[MetadataFetch] SteamGridDB error for ${game.name}: $e');
+        print('[MetadataFetch] SteamGridDB error for ${game.displayName}: $e');
       }
     }
 
     if (coverUrl == null && igdb != null && igdb!.isAuthenticated) {
       try {
-        final results = await igdb!.search(game.name);
+        final results = await igdb!.search(game.displayName);
         if (results.isNotEmpty) {
           coverUrl = results.first.thumbnailUrl ??
               await igdb!.getCoverUrl(results.first.id);
         }
       } catch (e) {
-        print('[MetadataFetch] IGDB error for ${game.name}: $e');
+        print('[MetadataFetch] IGDB error for ${game.displayName}: $e');
       }
     }
 

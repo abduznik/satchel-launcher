@@ -32,7 +32,7 @@ class _MetadataEditorDialogState extends ConsumerState<MetadataEditorDialog> {
   void initState() {
     super.initState();
     final meta = widget.game.metadata;
-    _nameController = TextEditingController(text: widget.game.name);
+    _nameController = TextEditingController(text: widget.game.displayName);
     _summaryController = TextEditingController(text: meta?.summary ?? '');
     _developerController = TextEditingController(text: meta?.developer ?? '');
     _publisherController = TextEditingController(text: meta?.publisher ?? '');
@@ -99,6 +99,7 @@ class _MetadataEditorDialogState extends ConsumerState<MetadataEditorDialog> {
     }
 
     final updatedMeta = GameMetadata(
+      name: widget.game.metadata?.name,
       summary: _summaryController.text.trim().isNotEmpty
           ? _summaryController.text.trim()
           : null,
@@ -119,13 +120,20 @@ class _MetadataEditorDialogState extends ConsumerState<MetadataEditorDialog> {
       steamGridDbId: widget.game.metadata?.steamGridDbId,
       igdbId: widget.game.metadata?.igdbId,
       screenScraperId: widget.game.metadata?.screenScraperId,
+      autoScanned: widget.game.metadata?.autoScanned ?? false,
     );
 
-    // Update the game with new name and metadata
+    // Update the game with new name and metadata.
+    // The edited title becomes the manual override (customName); the folder
+    // name stays as the identity/source of truth. If the user left the name
+    // equal to the scraped title, don't pin a redundant custom override.
+    final editedName = _nameController.text.trim();
+    final scrapedName = widget.game.metadata?.name?.trim() ?? '';
+    final customName =
+        editedName.isNotEmpty && editedName != scrapedName ? editedName : null;
+
     final updatedGame = widget.game.copyWith(
-      name: _nameController.text.trim().isNotEmpty
-          ? _nameController.text.trim()
-          : widget.game.name,
+      customName: customName,
       metadata: updatedMeta,
     );
 
@@ -159,7 +167,7 @@ class _MetadataEditorDialogState extends ConsumerState<MetadataEditorDialog> {
       // Merge metadata into existing — flattened at the TOP level, matching
       // what the scanner expects when it reads meta.json back. (Nesting under
       // a "metadata" key would be silently lost on the next rescan.)
-      existing['name'] = game.name;
+      existing['customName'] = game.customName;
       existing['coverPath'] = game.coverPath;
       existing['bannerPath'] = game.bannerPath;
       existing['autoScanned'] = true;

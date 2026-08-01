@@ -180,6 +180,7 @@ class IgdbApi {
           .toList();
 
       final metadata = GameMetadata(
+        name: g['name'] as String?,
         summary: g['summary'] as String?,
         genres: genres,
         releaseDate: releaseDate?.year.toString(),

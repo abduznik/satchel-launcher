@@ -85,7 +85,7 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
     });
     try {
       // Step 1: Search with confidence scoring
-      final results = await _pcgamingwiki.searchWithConfidence(widget.game.name);
+      final results = await _pcgamingwiki.searchWithConfidence(widget.game.displayName);
       if (!mounted) return;
 
       if (results.isEmpty) {
@@ -165,7 +165,7 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Multiple matches found for "${widget.game.name}". Select the correct one:',
+                'Multiple matches found for "${widget.game.displayName}". Select the correct one:',
                 style: TextStyle(fontSize: 13, color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
               const SizedBox(height: 12),
@@ -272,7 +272,7 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: Text('Save Location — ${widget.game.name}'),
+      title: Text('Save Location — ${widget.game.displayName}'),
       content: SizedBox(
         width: 480,
         child: Column(

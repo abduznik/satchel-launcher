@@ -35,8 +35,9 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
     final results = <ApiSearchResult>[];
 
     // Search across all enabled APIs
+    final query = widget.game.displayName;
     if (ref.read(apiConfigProvider).steamGridDbEnabled) {
-      final sgdResults = await steamGridDb.search(widget.game.name);
+      final sgdResults = await steamGridDb.search(query);
       results.addAll(sgdResults);
     }
 
@@ -48,12 +49,12 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
           if (igdbApi.isAuthenticated) break;
         }
       }
-      final igdbResults = await igdbApi.search(widget.game.name);
+      final igdbResults = await igdbApi.search(query);
       results.addAll(igdbResults);
     }
 
     if (ref.read(apiConfigProvider).screenScraperEnabled) {
-      final ssResults = await screenScraper.search(widget.game.name);
+      final ssResults = await screenScraper.search(query);
       results.addAll(ssResults);
     }
 
@@ -92,7 +93,7 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.game.name,
+                          widget.game.displayName,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 14,

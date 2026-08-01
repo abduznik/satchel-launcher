@@ -195,7 +195,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
       print(
           '[ArtworkFetch] Fetching full metadata for ${game.name} (cover=$hasCover, meta=$hasMetadata)...');
       try {
-        final candidates = await fetchService.searchCandidates(game.name);
+        final candidates = await fetchService.searchCandidates(game.displayName);
         if (!mounted) return;
 
         if (candidates.isNotEmpty) {

@@ -722,7 +722,7 @@ class _GameListRowState extends ConsumerState<_GameListRow> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        widget.game.name,
+                        widget.game.displayName,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: widget.isSelected
@@ -811,9 +811,9 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
       final shouldStop = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('${currentPlaying.game.name} is running'),
+          title: Text('${currentPlaying.game.displayName} is running'),
           content:
-              Text('Stop ${currentPlaying.game.name} and launch ${game.name}?'),
+              Text('Stop ${currentPlaying.game.displayName} and launch ${game.displayName}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -1014,7 +1014,7 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           Text(
-                            liveGame.name,
+                            liveGame.displayName,
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w800,

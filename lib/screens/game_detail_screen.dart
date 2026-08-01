@@ -189,7 +189,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                               children: [
                                 // Title
                                 Text(
-                                  game.name,
+                                  game.displayName,
                                   style: TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.w800,
@@ -722,8 +722,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
       final shouldStop = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('${currentPlaying.game.name} is running'),
-          content: Text('Stop ${currentPlaying.game.name} and launch ${widget.game.name}?'),
+          title: Text('${currentPlaying.game.displayName} is running'),
+          content: Text('Stop ${currentPlaying.game.displayName} and launch ${widget.game.displayName}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -905,8 +905,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                 children: [
                   Expanded(
                     child: Text(saveOnly
-                        ? 'Edit Save Location — ${widget.game.name}'
-                        : 'Setting Up ${widget.game.name}'),
+                        ? 'Edit Save Location — ${widget.game.displayName}'
+                        : 'Setting Up ${widget.game.displayName}'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -1000,7 +1000,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                                     savePathSource = 'Searching PCGamingWiki...';
                                   });
                                   _pcgamingwiki
-                                      .getSavePaths(widget.game.name,
+                                      .getSavePaths(widget.game.displayName,
                                           gameFolderPath:
                                               widget.game.folderPath)
                                       .then((paths) {

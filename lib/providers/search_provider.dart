@@ -23,7 +23,10 @@ final searchResultsProvider = Provider<AsyncValue<List<Game>>>((ref) {
 });
 
 bool _matchesQuery(Game game, String query) {
-  // Game name (folder name) — primary match
+  // Display name (custom → scraped → folder) — primary match
+  if (game.displayName.toLowerCase().contains(query)) return true;
+
+  // Folder name (identity) — always searchable too
   if (game.name.toLowerCase().contains(query)) return true;
 
   // Metadata fields
@@ -49,9 +52,9 @@ bool _matchesQuery(Game game, String query) {
 /// Scores how relevant a game is to the query. Higher = more relevant.
 int _relevanceScore(Game game, String query) {
   int score = 0;
-  final nameLower = game.name.toLowerCase();
+  final nameLower = game.displayName.toLowerCase();
 
-  // Exact match on name
+  // Exact match on display name
   if (nameLower == query) return 100;
 
   // Name starts with query
@@ -59,6 +62,11 @@ int _relevanceScore(Game game, String query) {
 
   // Name contains query
   if (nameLower.contains(query)) score += 30;
+
+  // Folder name match (secondary — the folder is the identity)
+  final folderLower = game.name.toLowerCase();
+  if (folderLower == query) score += 25;
+  if (folderLower.contains(query)) score += 10;
 
   // Genre match
   final meta = game.metadata;
