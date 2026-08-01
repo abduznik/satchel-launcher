@@ -1,6 +1,12 @@
-# Satchel
+<p align="center">
+  <img src="assets/icon.png" alt="Satchel Logo" width="120">
+</p>
 
-A portable, offline-first DRM-free game launcher that lives entirely on a USB drive. Drop your Windows games into a folder, plug the drive into any PC, and your library is ready — no installation, no cloud account, no launcher bloat.
+<h1 align="center">Satchel</h1>
+
+<p align="center">
+  A portable, offline-first DRM-free game launcher that lives entirely on a USB drive.
+</p>
 
 ## What Is This?
 

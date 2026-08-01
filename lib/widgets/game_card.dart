@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game.dart';
+import '../providers/game_library_provider.dart';
 import '../providers/playing_game_provider.dart';
 
 class GameCard extends ConsumerStatefulWidget {
@@ -57,17 +58,21 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // Always read the latest game from the provider (not widget.game which may be stale)
+    final games = ref.watch(gameLibraryProvider).valueOrNull ?? [];
+    final game = games.where((g) => g.id == widget.game.id).firstOrNull ?? widget.game;
+
     final accent = Theme.of(context).colorScheme.primary;
     final recentlyPlayed =
-        DateTime.now().difference(widget.game.lastPlayed).inDays < 7 &&
-        widget.game.lastPlayed.year > 2020;
+        DateTime.now().difference(game.lastPlayed).inDays < 7 &&
+        game.lastPlayed.year > 2020;
 
-    final hasCover = widget.game.coverPath != null &&
-        File(widget.game.coverPath!).existsSync();
+    final hasCover = game.coverPath != null &&
+        File(game.coverPath!).existsSync();
 
     // Check if this game is currently playing
     final playing = ref.watch(playingGameProvider);
-    final isThisGamePlaying = playing != null && playing.game.id == widget.game.id;
+    final isThisGamePlaying = playing != null && playing.game.id == game.id;
 
     return MouseRegion(
       onEnter: (_) => _onEnter(),
@@ -115,13 +120,13 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                     ? Container(
                         decoration: BoxDecoration(
                           image: DecorationImage(
-                            image: FileImage(File(widget.game.coverPath!)),
+                            image: FileImage(File(game.coverPath!)),
                             fit: BoxFit.cover,
                             onError: (_, __) {},
                           ),
                         ),
                       )
-                    : _Placeholder(name: widget.game.name),
+                    : _Placeholder(name: game.name),
 
                 // ── Bottom gradient (always) ─────────
                 const DecoratedBox(
@@ -242,7 +247,7 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          widget.game.name,
+                          game.name,
                           style: TextStyle(
                             color: isThisGamePlaying
                                 ? const Color(0xFF22C55E)
@@ -255,11 +260,11 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (widget.game.metadata?.genres.isNotEmpty == true)
+                        if (game.metadata?.genres.isNotEmpty == true)
                           Padding(
                             padding: const EdgeInsets.only(top: 3),
                             child: Text(
-                              widget.game.metadata!.genres.first,
+                              game.metadata!.genres.first,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.55),
                                 fontSize: 10,

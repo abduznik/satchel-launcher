@@ -32,7 +32,10 @@ void main() async {
 void _killOrphanedProcesses() {
   try {
     if (Platform.isWindows) {
+      // Kill any leftover OmniSave or game processes from previous sessions
       Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
+      // Kill orphaned satchel.exe processes (use taskkill /FI to filter)
+      Process.run('taskkill', ['/F', '/IM', 'satchel.exe']);
     }
   } catch (_) {}
 }

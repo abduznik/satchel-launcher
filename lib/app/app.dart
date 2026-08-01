@@ -48,7 +48,6 @@ class _SatchelAppState extends ConsumerState<SatchelApp>
   void _killOrphanedProcesses() {
     try {
       if (Platform.isWindows) {
-        // Kill any leftover OmniSave or game processes from this launcher
         Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
       }
     } catch (_) {}
