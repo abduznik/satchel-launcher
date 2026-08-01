@@ -1,10 +1,12 @@
+import '../services/drive_service.dart';
+
 class Game {
   final String id;
   final String name;
-  final String folderPath;
-  final String exePath;
-  final String? coverPath;
-  final String? bannerPath;
+  final String folderPath;   // Always absolute at runtime
+  final String exePath;      // Always absolute at runtime
+  final String? coverPath;   // Always absolute at runtime
+  final String? bannerPath;  // Always absolute at runtime
   final GameMetadata? metadata;
   final DateTime lastPlayed;
   final bool omniSaveEnabled;
@@ -20,6 +22,8 @@ class Game {
     DateTime? lastPlayed,
     this.omniSaveEnabled = true,
   }) : lastPlayed = lastPlayed ?? DateTime.now();
+
+  // ── Runtime JSON (used in-memory, all absolute paths) ──────────────────
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -46,6 +50,56 @@ class Game {
     lastPlayed: DateTime.parse(json['lastPlayed']),
     omniSaveEnabled: json['omniSaveEnabled'] ?? true,
   );
+
+  // ── Storage JSON (written to Hive, paths as ~/ relative) ───────────────
+
+  /// Converts to JSON with paths stored as ~/ notation relative to drive root.
+  /// ~/Games/Foo  instead of  H:\Games\Foo
+  /// This makes the Hive database portable across different PCs, mount points,
+  /// and Wine/Proton/Crossover environments.
+  Map<String, dynamic> toStorageJson() => {
+    'id': id,
+    'name': name,
+    'folderPath': DriveService.toPortable(folderPath),
+    'exePath': DriveService.toPortable(exePath),
+    'coverPath': coverPath != null ? DriveService.toPortable(coverPath!) : null,
+    'bannerPath': bannerPath != null ? DriveService.toPortable(bannerPath!) : null,
+    'metadata': metadata?.toJson(),
+    'lastPlayed': lastPlayed.toIso8601String(),
+    'omniSaveEnabled': omniSaveEnabled,
+  };
+
+  /// Creates a Game from storage JSON, resolving ~/ paths against the
+  /// current drive root. Handles both legacy absolute paths and new
+  /// ~/ relative paths transparently.
+  factory Game.fromStorageJson(Map<String, dynamic> json) {
+    return Game(
+      id: json['id'],
+      name: json['name'],
+      folderPath: _resolveStoredPath(json['folderPath']),
+      exePath: _resolveStoredPath(json['exePath']),
+      coverPath: json['coverPath'] != null
+          ? _resolveStoredPath(json['coverPath'])
+          : null,
+      bannerPath: json['bannerPath'] != null
+          ? _resolveStoredPath(json['bannerPath'])
+          : null,
+      metadata: json['metadata'] != null
+          ? GameMetadata.fromJson(json['metadata'])
+          : null,
+      lastPlayed: DateTime.parse(json['lastPlayed']),
+      omniSaveEnabled: json['omniSaveEnabled'] ?? true,
+    );
+  }
+
+  /// Resolves a stored path: ~/foo → absolute, or absolute → as-is (legacy).
+  static String _resolveStoredPath(String stored) {
+    if (stored.startsWith('~/')) {
+      return DriveService.resolvePortable(stored);
+    }
+    // Legacy absolute path or external path — keep as-is
+    return stored;
+  }
 
   Game copyWith({
     String? name,

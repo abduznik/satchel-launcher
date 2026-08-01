@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import '../providers/game_library_provider.dart';
 import '../services/drive_service.dart';
+import '../services/migration_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -60,7 +61,32 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     print('[SplashScreen] setupDone = $setupDone');
 
     if (!setupDone) {
-      // Brief pause so splash is visible, then go to setup
+      // Check if there's existing data on the drive that could be migrated
+      final migrationInfo = await MigrationService.scan();
+      if (!mounted) return;
+
+      if (migrationInfo.hasAnyData) {
+        // Found existing data — show migration dialog before setup
+        final shouldMigrate = await _showMigrationDialog(migrationInfo);
+        if (!mounted) return;
+
+        if (shouldMigrate) {
+          final result = await MigrationService.migrate();
+          if (!mounted) return;
+
+          if (result.success && result.settingsImported) {
+            // Migration successful — go straight to library
+            final hasCached = Hive.box('games').get('games', defaultValue: []) as List;
+            if (hasCached.isNotEmpty) {
+              Navigator.of(context).pushReplacementNamed('/library');
+              ref.read(gameLibraryProvider.notifier).rescan();
+              return;
+            }
+          }
+        }
+      }
+
+      // No data to migrate or user declined — go to setup
       await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/setup');
@@ -85,6 +111,75 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         Navigator.of(context).pushReplacementNamed('/library');
       }
     }
+  }
+
+  Future<bool> _showMigrationDialog(MigrationInfo info) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.find_in_page_rounded, color: Color(0xFF7C3AED), size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Existing Data Found')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We found existing data on this drive:',
+              style: TextStyle(fontSize: 13, color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.7)),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                info.describe(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Would you like to import this data? Your API keys, '
+              'settings, and game metadata will be restored. '
+              'Game files themselves will not be copied.',
+              style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.5), height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Start Fresh', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.5))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Import Data'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override

@@ -37,7 +37,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     try {
       final cached = _gamesBox.get('games', defaultValue: []);
       final rawGames = (cached as List)
-          .map((g) => Game.fromJson(_deepCast(g)))
+          .map((g) => Game.fromStorageJson(_deepCast(g)))
           .toList();
 
       // Validate file paths — clear any that no longer exist on disk
@@ -80,7 +80,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
       print('[GameLibraryNotifier] Found ${scannedGames.length} games');
       state = AsyncValue.data(scannedGames);
 
-      final jsonList = scannedGames.map((g) => g.toJson()).toList();
+      final jsonList = scannedGames.map((g) => g.toStorageJson()).toList();
       await _gamesBox.put('games', jsonList);
 
       // Kick off artwork fetching in the background — does not block rescan.
@@ -167,7 +167,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     newGames[index] = updatedGame;
     state = AsyncValue.data(newGames);
 
-    final jsonList = newGames.map((g) => g.toJson()).toList();
+    final jsonList = newGames.map((g) => g.toStorageJson()).toList();
     await _gamesBox.put('games', jsonList);
   }
 
@@ -186,7 +186,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     final newGames = currentGames.where((g) => g.id != gameId).toList();
     state = AsyncValue.data(newGames);
 
-    final jsonList = newGames.map((g) => g.toJson()).toList();
+    final jsonList = newGames.map((g) => g.toStorageJson()).toList();
     await _gamesBox.put('games', jsonList);
   }
 }

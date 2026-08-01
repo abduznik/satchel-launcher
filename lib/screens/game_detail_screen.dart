@@ -13,6 +13,7 @@ import '../providers/theme_provider.dart';
 
 import '../services/omnisave_service.dart';
 import '../services/pcgamingwiki_service.dart';
+import '../services/platform_service.dart';
 import '../services/windows_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/focus_effect_wrapper.dart';
@@ -613,7 +614,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
   }
 
   void _openUrl(String url) {
-    Process.run('cmd', ['/c', 'start', '', url]);
+    PlatformService.openUrl(url);
   }
 
   Future<void> _confirmOpenVideo(String title, String url) async {
@@ -807,7 +808,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
     String portableSavePath = '';
 
     String toPortable(String abs) {
-      final userProfile = Platform.environment['USERPROFILE'] ?? '';
+      // Cross-platform: HOME on Unix, USERPROFILE on Windows (or via Wine).
+      final userProfile = Platform.environment['USERPROFILE'] ??
+          Platform.environment['HOME'] ??
+          '';
       if (userProfile.isNotEmpty &&
           abs.toLowerCase().startsWith(userProfile.toLowerCase())) {
         final rel = abs.substring(userProfile.length).replaceAll('\\', '/');

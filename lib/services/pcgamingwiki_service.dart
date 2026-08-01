@@ -349,7 +349,10 @@ class PcgamingwikiService {
   /// Expands a portable OmniSave path (~/...) to an absolute path for display.
   /// This is what the user sees in the text field — not what gets written to omnisave.ini.
   static String expandForDisplay(String portablePath) {
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
+    // Cross-platform: HOME on Unix, USERPROFILE on Windows (or via Wine).
+    final userProfile = Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '';
     if (portablePath.startsWith('~/')) {
       return ('$userProfile\\${portablePath.substring(2)}')
           .replaceAll('/', '\\');

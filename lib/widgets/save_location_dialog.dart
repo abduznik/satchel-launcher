@@ -117,14 +117,18 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
   }
 
   /// Converts an absolute path picked via Browse back to portable ~/... form.
+  /// Used for OmniSave's ~/ notation (maps to %USERPROFILE% at launch time).
   String _toPortable(String absolutePath) {
-    final userProfile = Platform.environment['USERPROFILE'] ?? '';
+    // Cross-platform: HOME on Unix, USERPROFILE on Windows (or via Wine).
+    final userProfile = Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '';
     if (userProfile.isNotEmpty &&
         absolutePath.toLowerCase().startsWith(userProfile.toLowerCase())) {
       final rel = absolutePath.substring(userProfile.length).replaceAll('\\', '/');
       return '~$rel'; // e.g. ~/AppData/Roaming/SomeGame
     }
-    // Not under userprofile — store as-is with forward slashes
+    // Not under user profile — store as-is with forward slashes
     return absolutePath.replaceAll('\\', '/');
   }
 

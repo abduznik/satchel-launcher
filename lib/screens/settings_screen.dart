@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:hive/hive.dart';
 import '../providers/theme_provider.dart';
 import '../providers/api_provider.dart';
 import '../providers/settings_provider.dart';
@@ -225,6 +226,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 20),
+                      _Section(
+                        icon: Icons.restore_rounded,
+                        title: 'Danger Zone',
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Reset the setup wizard to reconfigure paths, '
+                                  'API keys, and other settings from scratch.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.onSurface.withValues(alpha: 0.5),
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Your games and cached metadata will NOT be deleted.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: const Color(0xFF22C55E).withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                _ActionButton(
+                                  label: 'Reset Setup Wizard',
+                                  icon: Icons.restart_alt_rounded,
+                                  success: false,
+                                  onTap: () => _confirmResetSetup(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -318,6 +360,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         fields: fields,
         validator: validator,
         onSave: onSave,
+      ),
+    );
+  }
+
+  void _confirmResetSetup() {
+    final cs = ref.read(themeProvider).theme.colorScheme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: cs.error, size: 22),
+            const SizedBox(width: 10),
+            const Text('Reset Setup?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will clear your setup configuration and restart the setup wizard on next launch.',
+              style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.7)),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, size: 16, color: Colors.green[400]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Games and cached metadata will NOT be deleted.',
+                      style: TextStyle(fontSize: 12, color: Colors.green[400]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final box = Hive.box('settings');
+              await box.put('setupDone', false);
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: cs.error),
+            child: const Text('Reset'),
+          ),
+        ],
       ),
     );
   }

@@ -70,12 +70,8 @@ class OmniSaveService {
   }
 
   String _defaultSavePath(Game game) {
-    return p.join(
-      Platform.environment['USERPROFILE'] ?? '',
-      'Documents',
-      'Saves',
-      game.name,
-    );
+    // Use ~/Saves/<GameName> — portable across PCs and mount points.
+    return p.join(DriveService.savesPath, game.name);
   }
 
   /// Launches the game via OmniSave if the exe is available.

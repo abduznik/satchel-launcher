@@ -12,6 +12,7 @@ import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/ui_provider.dart';
 import '../services/omnisave_service.dart';
+import '../services/platform_service.dart';
 import '../services/windows_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/game_grid.dart';
@@ -841,7 +842,7 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
       ),
     );
     if (confirmed == true) {
-      Process.run('cmd', ['/c', 'start', '', url]);
+      PlatformService.openUrl(url);
     }
   }
 
