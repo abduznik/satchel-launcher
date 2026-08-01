@@ -43,14 +43,13 @@ class MetadataFetchService {
     return results;
   }
 
-  // ---------------------------------------------------------------------------
-  // Fetch full metadata + images for a selected result and save to disk.
-  // Returns updated Game fields (coverPath, bannerPath, metadata).
-  // ---------------------------------------------------------------------------
+  /// Fetch full metadata + images for a selected result and save to disk.
+  /// If [clearOld] is true, deletes existing cover/banner/screenshots first.
   Future<FetchedGameData> fetchFull(
     Game game,
-    ApiSearchResult selected,
-  ) async {
+    ApiSearchResult selected, {
+    bool clearOld = false,
+  }) async {
     String? coverPath;
     String? bannerPath;
     GameMetadata? metadata;
@@ -58,6 +57,17 @@ class MetadataFetchService {
 
     final indieDir = Directory(p.join(game.folderPath, '.indie'));
     if (!await indieDir.exists()) await indieDir.create(recursive: true);
+
+    // Clear old assets if requested (for re-fetch / manual override)
+    if (clearOld) {
+      print('[MetadataFetch] Clearing old assets for ${game.name}');
+      final oldCover = File(p.join(indieDir.path, 'cover.jpg'));
+      final oldBanner = File(p.join(indieDir.path, 'banner.jpg'));
+      final oldSS = Directory(p.join(indieDir.path, 'screenshots'));
+      if (await oldCover.exists()) await oldCover.delete();
+      if (await oldBanner.exists()) await oldBanner.delete();
+      if (await oldSS.exists()) await oldSS.delete(recursive: true);
+    }
 
     if (selected.source == 'igdb' && igdb != null && igdb!.isAuthenticated) {
       final details = await igdb!.getFullDetails(selected.id);

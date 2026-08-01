@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,16 @@ class _SatchelAppState extends ConsumerState<SatchelApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      // App is closing — force exit to release all file handles (icudtl.dat, etc.)
+      // This prevents the app from ghosting and locking files.
+      print('[Satchel] App detached — forcing exit');
+      exit(0);
+    }
   }
 
   @override

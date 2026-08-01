@@ -84,25 +84,62 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
       _savePathSource = 'Searching PCGamingWiki...';
     });
     try {
+      // Step 1: Search with confidence scoring
+      final results = await _pcgamingwiki.searchWithConfidence(widget.game.name);
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        setState(() {
+          _savePathSource = 'Not found on PCGamingWiki';
+          _saveDetecting = false;
+        });
+        return;
+      }
+
+      // Step 2: If top result is very confident (>0.9), auto-select
+      String? selectedTitle;
+      if (results.first.score >= 0.9) {
+        selectedTitle = results.first.title;
+        print('[SaveLocation] Auto-selected: $selectedTitle (${results.first.score})');
+      } else if (results.length == 1) {
+        // Only one result — use it even with lower confidence
+        selectedTitle = results.first.title;
+        print('[SaveLocation] Single result: $selectedTitle (${results.first.score})');
+      } else {
+        // Step 3: Ambiguous — show picker
+        selectedTitle = await _showPcgwPicker(results);
+        if (!mounted) return;
+      }
+
+      if (selectedTitle == null) {
+        setState(() {
+          _savePathSource = 'No page selected';
+          _saveDetecting = false;
+        });
+        return;
+      }
+
+      // Step 4: Fetch save paths from the selected page
       final paths = await _pcgamingwiki.getSavePaths(
-        widget.game.name,
+        selectedTitle,
         gameFolderPath: widget.game.folderPath,
       );
       if (!mounted) return;
+
       if (paths.isNotEmpty) {
-        final portable = paths.first; // already in ~/... form
+        final portable = paths.first;
         final isPortable = portable.startsWith('./');
         setState(() {
           _portablePath = portable;
-          _displayController.text = portable; // show ~/... form directly
-          _savePathSource = 'Detected via PCGamingWiki';
+          _displayController.text = portable;
+          _savePathSource = 'Detected: $selectedTitle';
           _skipSaveSync = isPortable;
           _savesArePortable = isPortable;
           _saveDetecting = false;
         });
       } else {
         setState(() {
-          _savePathSource = 'Not found on PCGamingWiki';
+          _savePathSource = 'Found "$selectedTitle" but no Windows save paths';
           _saveDetecting = false;
         });
       }
@@ -114,6 +151,46 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
         });
       }
     }
+  }
+
+  /// Shows a picker dialog for ambiguous PCGamingWiki matches.
+  Future<String?> _showPcgwPicker(List<PcgwSearchResult> results) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Game'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Multiple matches found for "${widget.game.name}". Select the correct one:',
+                style: TextStyle(fontSize: 13, color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.6)),
+              ),
+              const SizedBox(height: 12),
+              ...results.map((r) {
+                    final pct = (r.score * 100).toStringAsFixed(0);
+                    return ListTile(
+                      title: Text(r.title),
+                      subtitle: Text('$pct% match'),
+                      leading: CircleAvatar(
+                        child: Text(pct),
+                      ),
+                      onTap: () => Navigator.pop(ctx, r.title),
+                    );
+                  }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Converts an absolute path picked via Browse back to portable ~/... form.

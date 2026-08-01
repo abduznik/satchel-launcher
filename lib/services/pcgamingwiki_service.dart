@@ -1,6 +1,18 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 
+/// Result from PCGamingWiki search with confidence score.
+class PcgwSearchResult {
+  final String title;
+  final double score; // 0.0 to 1.0
+  final String url;
+
+  PcgwSearchResult({required this.title, required this.score, required this.url});
+
+  @override
+  String toString() => '$title (${(score * 100).toStringAsFixed(0)}%)';
+}
+
 class PcgamingwikiService {
   static const _apiBase = 'https://www.pcgamingwiki.com/w/api.php';
   static const _userAgent = 'Satchel/1.0 (portable-game-launcher) Dio/5.0';
@@ -9,83 +21,192 @@ class PcgamingwikiService {
   PcgamingwikiService({Dio? dio})
       : _dio = dio ?? Dio(BaseOptions(headers: {'User-Agent': _userAgent}));
 
-  /// Search for a page title on PCGamingWiki using opensearch.
-  /// Tries multiple query strategies to handle dashes, colons, etc.
-  Future<String?> findPageTitle(String gameName) async {
-    final candidates = _buildSearchCandidates(gameName);
-    for (final query in candidates) {
-      final result = await _opensearch(query);
-      if (result != null) {
-        print('[PCGWiki] Found page "$result" via query "$query"');
-        return result;
+  // ---------------------------------------------------------------------------
+  // Public API: find page title with confidence scoring
+  // ---------------------------------------------------------------------------
+
+  /// Searches PCGamingWiki for a game and returns the best match.
+  /// If confidence is high (>0.9), returns the single best match.
+  /// If confidence is medium (0.5-0.9), returns multiple candidates for user to pick.
+  /// If no results, returns empty list.
+  Future<List<PcgwSearchResult>> searchWithConfidence(String gameName) async {
+    final results = <PcgwSearchResult>[];
+
+    // Strategy 1: Search with exact name
+    final exactResults = await _searchAndScore(gameName);
+    results.addAll(exactResults);
+
+    // Strategy 2: If no results, try with colon inserted before subtitle words
+    if (results.isEmpty && !gameName.contains(':')) {
+      final withColon = _insertColonBeforeSubtitle(gameName);
+      if (withColon != null) {
+        final colonResults = await _searchAndScore(withColon);
+        results.addAll(colonResults);
       }
     }
 
-    // Last resort: try direct page fetch by sanitized name (PCGW may have that exact title)
-    final directTitle = await _tryDirectPage(gameName);
-    if (directTitle != null) {
-      print('[PCGWiki] Found page "$directTitle" via direct fetch');
-      return directTitle;
+    // Strategy 3: If still no results, try stripped punctuation
+    if (results.isEmpty) {
+      final stripped = gameName.replaceAll(RegExp(r"[^\w\s]"), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (stripped != gameName && stripped.length > 3) {
+        final strippedResults = await _searchAndScore(stripped);
+        results.addAll(strippedResults);
+      }
     }
 
-    print('[PCGWiki] No page found for: $gameName');
+    // Dedupe by title, keep highest score
+    final seen = <String, PcgwSearchResult>{};
+    for (final r in results) {
+      final key = r.title.toLowerCase();
+      if (!seen.containsKey(key) || seen[key]!.score < r.score) {
+        seen[key] = r;
+      }
+    }
+
+    // Sort by score descending
+    final deduped = seen.values.toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
+
+    return deduped;
+  }
+
+  /// Finds the best match for a game name.
+  /// Returns the page title if confidence > 0.9, null otherwise.
+  Future<String?> findPageTitle(String gameName) async {
+    final results = await searchWithConfidence(gameName);
+    if (results.isEmpty) return null;
+
+    // Auto-select if top result is very confident
+    if (results.first.score >= 0.9) {
+      print('[PCGWiki] Auto-selected "${results.first.title}" (${results.first.score})');
+      return results.first.title;
+    }
+
+    // Not confident enough — caller should show picker
+    print('[PCGWiki] Low confidence for "$gameName": ${results.first.title} (${results.first.score})');
     return null;
   }
 
-  /// Build a list of search candidate strings to try in order.
-  List<String> _buildSearchCandidates(String gameName) {
-    final candidates = <String>[];
+  // ---------------------------------------------------------------------------
+  // Search + Score
+  // ---------------------------------------------------------------------------
 
-    // 1. Exact name (try this first — colons work in PCGW search)
-    candidates.add(gameName);
+  Future<List<PcgwSearchResult>> _searchAndScore(String query) async {
+    final results = <PcgwSearchResult>[];
 
-    // 2. Replace dashes/underscores with spaces (but keep colons)
-    final spacified = gameName.replaceAll(RegExp(r'[-_]'), ' ').trim();
-    if (spacified != gameName) candidates.add(spacified);
-
-    // 3. Strip subtitle (anything after : or – or —)
-    final noSubtitle = gameName.split(RegExp(r'[:\u2013\u2014]')).first.trim();
-    if (noSubtitle != gameName && noSubtitle.length > 3) candidates.add(noSubtitle);
-
-    // 4. Strip subtitle from spacified version
-    final spacifiedNoSub = spacified.split(RegExp(r'[:\u2013\u2014]')).first.trim();
-    if (!candidates.contains(spacifiedNoSub) && spacifiedNoSub.length > 3) {
-      candidates.add(spacifiedNoSub);
+    // Try opensearch
+    final opensearchResults = await _opensearch(query);
+    if (opensearchResults != null) {
+      for (final title in opensearchResults) {
+        // Skip series pages
+        if (title.startsWith('Series:')) continue;
+        final score = _computeScore(query, title);
+        results.add(PcgwSearchResult(
+          title: title,
+          score: score,
+          url: 'https://www.pcgamingwiki.com/wiki/${title.replaceAll(' ', '_')}',
+        ));
+      }
     }
 
-    // 5. Remove ALL punctuation including colons (fallback)
-    final noPunct = gameName.replaceAll(RegExp(r"[^\w\s]"), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (!candidates.contains(noPunct) && noPunct.length > 3) candidates.add(noPunct);
-
-    // 6. First two "words" (for very long names)
-    final words = spacifiedNoSub.split(' ').where((w) => w.isNotEmpty).toList();
-    if (words.length > 2) {
-      final shortName = words.take(2).join(' ');
-      if (!candidates.contains(shortName)) candidates.add(shortName);
+    // Also try direct page fetch
+    final directTitle = await _tryDirectPage(query);
+    if (directTitle != null && !results.any((r) => r.title == directTitle)) {
+      final score = _computeScore(query, directTitle);
+      results.add(PcgwSearchResult(
+        title: directTitle,
+        score: score,
+        url: 'https://www.pcgamingwiki.com/wiki/${directTitle.replaceAll(' ', '_')}',
+      ));
     }
 
-    // 7. Try with "The" moved to end (common PCGW convention: "Game, The")
-    if (gameName.toLowerCase().startsWith('the ')) {
-      final withoutThe = gameName.substring(4).trim();
-      final moved = '$withoutThe, The';
-      if (!candidates.contains(moved)) candidates.add(moved);
-    }
-
-    // 8. Title-case first letter of each word (PCGW uses title case)
-    final titleCase = gameName.split(' ').map((w) {
-      if (w.isEmpty) return w;
-      return w[0].toUpperCase() + w.substring(1).toLowerCase();
-    }).join(' ');
-    if (!candidates.contains(titleCase) && titleCase != gameName) {
-      candidates.add(titleCase);
-    }
-
-    return candidates.map((c) => c.trim()).where((c) => c.isNotEmpty).toSet().toList();
+    return results;
   }
 
-  Future<String?> _opensearch(String query) async {
+  // ---------------------------------------------------------------------------
+  // Scoring: fuzzy string similarity
+  // ---------------------------------------------------------------------------
+
+  /// Computes similarity between query and result title (0.0 to 1.0).
+  double _computeScore(String query, String title) {
+    final q = query.toLowerCase().trim();
+    final t = title.toLowerCase().trim();
+
+    // Exact match
+    if (q == t) return 1.0;
+
+    // One contains the other
+    if (t.contains(q)) return 0.95;
+    if (q.contains(t)) return 0.9;
+
+    // Levenshtein-based similarity
+    final distance = _levenshtein(q, t);
+    final maxLen = q.length > t.length ? q.length : t.length;
+    if (maxLen == 0) return 0.0;
+
+    final similarity = 1.0 - (distance / maxLen);
+
+    // Bonus for word overlap
+    final queryWords = q.split(RegExp(r'\s+')).toSet();
+    final titleWords = t.split(RegExp(r'\s+')).toSet();
+    final intersection = queryWords.intersection(titleWords);
+    final wordBonus = intersection.length / (queryWords.length > titleWords.length ? queryWords.length : titleWords.length);
+
+    return (similarity * 0.7 + wordBonus * 0.3).clamp(0.0, 1.0);
+  }
+
+  /// Levenshtein distance between two strings.
+  int _levenshtein(String a, String b) {
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+
+    final matrix = List.generate(a.length + 1, (i) => List.generate(b.length + 1, (j) => 0));
+
+    for (var i = 0; i <= a.length; i++) { matrix[i][0] = i; }
+    for (var j = 0; j <= b.length; j++) { matrix[0][j] = j; }
+
+    for (var i = 1; i <= a.length; i++) {
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        matrix[i][j] = [
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost,
+        ].reduce((a, b) => a < b ? a : b);
+      }
+    }
+
+    return matrix[a.length][b.length];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Search helpers
+  // ---------------------------------------------------------------------------
+
+  /// Try inserting a colon before common subtitle words.
+  /// "LEGO Batman Legacy of the Dark Knight" → "LEGO Batman: Legacy of the Dark Knight"
+  /// Try inserting a colon before common subtitle words, or after the first word.
+  /// "LEGO Batman Legacy of the Dark Knight" → "LEGO Batman: Legacy of the Dark Knight"
+  /// "Danganronpa Trigger Happy Havoc" → "Danganronpa: Trigger Happy Havoc"
+  String? _insertColonBeforeSubtitle(String gameName) {
+    // Strategy A: Insert colon before known subtitle words
+    final match = RegExp(r'\s+(Legacy|Subtitle|The|A|An|Of|Trigger)\s', caseSensitive: false)
+        .firstMatch(gameName);
+    if (match != null) {
+      return '${gameName.substring(0, match.start)}:${gameName.substring(match.start)}';
+    }
+
+    // Strategy B: Insert colon after first word (common pattern: "Name: Subtitle")
+    final words = gameName.split(' ');
+    if (words.length >= 3) {
+      return '${words[0]}: ${words.sublist(1).join(' ')}';
+    }
+
+    return null;
+  }
+
+  Future<List<String>?> _opensearch(String query) async {
     try {
       final response = await _dio.get(_apiBase, queryParameters: {
         'action': 'opensearch',
@@ -97,7 +218,7 @@ class PcgamingwikiService {
       final data = response.data;
       if (data is List && data.length >= 2) {
         final titles = data[1] as List;
-        if (titles.isNotEmpty) return titles[0].toString();
+        if (titles.isNotEmpty) return titles.cast<String>();
       }
       return null;
     } catch (e) {
@@ -106,9 +227,7 @@ class PcgamingwikiService {
     }
   }
 
-  /// Try fetching the page directly (PCGW redirects common name variants).
   Future<String?> _tryDirectPage(String gameName) async {
-    // PCGW page titles use spaces and title-case; try the game name as-is
     try {
       final response = await _dio.get(_apiBase, queryParameters: {
         'action': 'parse',
@@ -127,7 +246,10 @@ class PcgamingwikiService {
     }
   }
 
-  /// Get wikitext for a page title.
+  // ---------------------------------------------------------------------------
+  // Wikitext parsing (unchanged)
+  // ---------------------------------------------------------------------------
+
   Future<String?> _getWikitext(String pageTitle) async {
     try {
       final response = await _dio.get(_apiBase, queryParameters: {
@@ -144,17 +266,25 @@ class PcgamingwikiService {
     }
   }
 
-  /// Get Windows save paths for a game by name.
-  /// Returns list of raw paths (with {{p|...}} already expanded).
-  /// [gameFolderPath] is used to resolve {{p|game}}.
   Future<List<String>> getSavePaths(String gameName, {String? gameFolderPath}) async {
-    final title = await findPageTitle(gameName);
+    // First try direct search
+    var title = await findPageTitle(gameName);
+
+    // If not found, try with confidence search and use best result
+    if (title == null) {
+      final results = await searchWithConfidence(gameName);
+      if (results.isNotEmpty) {
+        title = results.first.title;
+        print('[PCGWiki] Using best match: $title (${results.first.score})');
+      }
+    }
+
     if (title == null) {
       print('[PCGWiki] No page found for: $gameName');
       return [];
     }
-    print('[PCGWiki] Found page: $title');
 
+    print('[PCGWiki] Found page: $title');
     final wikitext = await _getWikitext(title);
     if (wikitext == null) {
       print('[PCGWiki] No wikitext for: $title');
@@ -166,16 +296,13 @@ class PcgamingwikiService {
 
   List<String> _extractWindowsSavePaths(String wikitext, {String? gameFolderPath}) {
     final paths = <String>[];
-    // Use a brace-depth-aware scan instead of regex, because the path content
-    // itself contains nested {{p|...}} templates that break simple regex.
     const prefix = '{{Game data/saves|Windows|';
     var searchFrom = 0;
     while (true) {
       final start = wikitext.toLowerCase().indexOf(prefix.toLowerCase(), searchFrom);
       if (start == -1) break;
       final contentStart = start + prefix.length;
-      // Scan forward with brace depth to find the closing }} of this template
-      var depth = 2; // we opened {{ at 'start'
+      var depth = 2;
       var i = contentStart;
       while (i < wikitext.length && depth > 0) {
         if (i + 1 < wikitext.length && wikitext[i] == '{' && wikitext[i + 1] == '{') {
@@ -194,40 +321,30 @@ class PcgamingwikiService {
 
       if (raw.isEmpty) continue;
 
-      // The template may contain multiple pipe-separated paths:
-      // {{Game data/saves|Windows|PATH1|PATH2}}
-      // Split on top-level | (not inside {{ }}) to get individual paths.
       final rawPaths = _splitTopLevelPipes(raw);
 
       for (final rawPath in rawPaths) {
         if (rawPath.trim().isEmpty) continue;
-
-        // Skip paths that are purely Steam-specific (Steam userdata, no user path)
         if (_isSteamOnlyPath(rawPath)) {
           print('[PCGWiki] Skipping Steam-only path: $rawPath');
           continue;
         }
 
         final expanded = _expandPcgwPath(rawPath.trim(), gameFolderPath: gameFolderPath);
-
-        // Strip trailing glob/placeholder segments FIRST (*.sav, <uid>\*.json, etc.)
-        // so that unresolved-token check runs on the cleaned path
         final cleaned = _stripGlobSuffix(expanded);
 
-        // Skip if still has unresolved Steam tokens after stripping
         if (_hasUnresolvedSteamTokens(cleaned)) {
-          print('[PCGWiki] Skipping unresolvable path: $rawPath → $cleaned');
+          print('[PCGWiki] Skipping unresolvable path: $rawPath -> $cleaned');
           continue;
         }
 
-        print('[PCGWiki] Save path: $rawPath → $cleaned');
+        print('[PCGWiki] Save path: $rawPath -> $cleaned');
         paths.add(cleaned);
       }
     }
     return paths;
   }
 
-  /// Splits a string on | characters that are not inside {{ }} braces.
   List<String> _splitTopLevelPipes(String raw) {
     final parts = <String>[];
     var depth = 0;
@@ -256,16 +373,11 @@ class PcgamingwikiService {
   }
 
   bool _hasUnresolvedSteamTokens(String expanded) {
-    return expanded.contains('<steam') ||
-        expanded.contains('<uid>');
+    return expanded.contains('<steam') || expanded.contains('<uid>');
   }
 
-  /// Strips trailing glob segments and user-id placeholders from an expanded path.
-  /// e.g. C:\foo\<user-id>\*.json → C:\foo
-  ///      C:\foo\saves\*.sav → C:\foo\saves
   String _stripGlobSuffix(String path) {
     var result = path;
-    // Repeatedly strip trailing \<...> or \*.ext segments
     final trailingTokens = RegExp(r'[/\\](<[^>]+>|\*\.[a-zA-Z0-9]+|\*)[/\\]?$');
     while (trailingTokens.hasMatch(result)) {
       result = result.replaceFirst(trailingTokens, '');
@@ -274,105 +386,72 @@ class PcgamingwikiService {
   }
 
   String _expandPcgwPath(String raw, {String? gameFolderPath}) {
-    // Strip any [[Note N]] or {{Note|...}} refs embedded in the path
     var result = raw.replaceAll(RegExp(r'\[\[Note \d+\]\]', caseSensitive: false), '');
     result = result.replaceAll(RegExp(r'\{\{Note\|[^}]*\}\}', caseSensitive: false), '');
     result = result.trim();
 
-    // Replace {{p|xxx}} tokens with OmniSave-portable paths (~/... notation)
     result = result.replaceAllMapped(RegExp(r'\{\{p\|([^}]+)\}\}', caseSensitive: false), (m) {
       return _resolveToken(m.group(1)!.toLowerCase().trim(), gameFolderPath);
     });
 
-    // Also handle raw %VARIABLE% tokens — convert known ones to ~/... form
     result = result.replaceAllMapped(RegExp(r'%([^%]+)%'), (m) {
       return _resolveEnvToken(m.group(1)!);
     });
 
-    // Normalize backslashes to forward slashes for OmniSave compatibility
     result = result.replaceAll('\\', '/');
-
     return result;
   }
 
-  /// Resolves a {{p|key}} token to an OmniSave-portable path.
-  /// Uses ~/ for anything under %USERPROFILE% so the path works on any PC.
-  /// Uses ./ for game-relative paths.
   String _resolveToken(String key, String? gameFolderPath) {
-    // Normalize: PCGW sometimes uses backslash-separated compound keys
-    // e.g. "userprofile\appdata\locallow" — convert to forward slashes for matching
     final normKey = key.replaceAll('\\', '/').toLowerCase().trim();
 
-    // Match compound path-style keys first (e.g. {{p|userprofile\appdata\locallow}})
     if (normKey == 'userprofile/appdata/locallow') return '~/AppData/LocalLow';
     if (normKey == 'userprofile/appdata/roaming') return '~/AppData/Roaming';
-    if (normKey == 'userprofile/appdata/local')   return '~/AppData/Local';
-    if (normKey == 'userprofile/documents')        return '~/Documents';
-    if (normKey == 'userprofile/saved games')      return '~/Saved Games';
+    if (normKey == 'userprofile/appdata/local') return '~/AppData/Local';
+    if (normKey == 'userprofile/documents') return '~/Documents';
+    if (normKey == 'userprofile/saved games') return '~/Saved Games';
 
     switch (normKey) {
-      case 'game':
-        return './';
+      case 'game': return './';
       case 'userprofile':
-      case 'osprofile':
-        return '~/';
-      case 'appdata':
-        return '~/AppData/Roaming';
-      case 'localappdata':
-        return '~/AppData/Local';
-      case 'localappdatalow':
-        return '~/AppData/LocalLow';
-      case 'documents':
-        return '~/Documents';
-      case 'savedgames':
-        return '~/Saved Games';
-      case 'public':
-        // Not user-relative; fall back to absolute on this machine
-        return Platform.environment['PUBLIC'] ?? r'C:/Users/Public';
-      case 'programfiles':
-        return Platform.environment['ProgramFiles']?.replaceAll('\\', '/') ?? r'C:/Program Files';
-      case 'programfilesx86':
-        return Platform.environment['ProgramFiles(x86)']?.replaceAll('\\', '/') ?? r'C:/Program Files (x86)';
-      case 'windir':
-        return Platform.environment['WINDIR']?.replaceAll('\\', '/') ?? r'C:/Windows';
+      case 'osprofile': return '~/';
+      case 'appdata': return '~/AppData/Roaming';
+      case 'localappdata': return '~/AppData/Local';
+      case 'localappdatalow': return '~/AppData/LocalLow';
+      case 'documents': return '~/Documents';
+      case 'savedgames': return '~/Saved Games';
+      case 'public': return Platform.environment['PUBLIC'] ?? r'C:/Users/Public';
+      case 'programfiles': return Platform.environment['ProgramFiles']?.replaceAll('\\', '/') ?? r'C:/Program Files';
+      case 'programfilesx86': return Platform.environment['ProgramFiles(x86)']?.replaceAll('\\', '/') ?? r'C:/Program Files (x86)';
+      case 'windir': return Platform.environment['WINDIR']?.replaceAll('\\', '/') ?? r'C:/Windows';
       case 'steam':
       case 'steamuserdataid':
-      case 'uid':
-        return '<$normKey>';
+      case 'uid': return '<$normKey>';
       default:
         final envVal = Platform.environment[normKey] ?? Platform.environment[normKey.toUpperCase()];
         return envVal?.replaceAll('\\', '/') ?? '<$normKey>';
     }
   }
 
-  /// Converts a raw %VAR% token to OmniSave-portable form where possible.
   String _resolveEnvToken(String key) {
     switch (key.toUpperCase()) {
-      case 'USERPROFILE':
-        return '~/';
-      case 'APPDATA':
-        return '~/AppData/Roaming';
-      case 'LOCALAPPDATA':
-        return '~/AppData/Local';
+      case 'USERPROFILE': return '~/';
+      case 'APPDATA': return '~/AppData/Roaming';
+      case 'LOCALAPPDATA': return '~/AppData/Local';
       case 'TEMP':
-      case 'TMP':
-        return '~/AppData/Local/Temp';
+      case 'TMP': return '~/AppData/Local/Temp';
       default:
         final val = Platform.environment[key] ?? Platform.environment[key.toUpperCase()];
         return val?.replaceAll('\\', '/') ?? '%$key%';
     }
   }
 
-  /// Expands a portable OmniSave path (~/...) to an absolute path for display.
-  /// This is what the user sees in the text field — not what gets written to omnisave.ini.
   static String expandForDisplay(String portablePath) {
-    // Cross-platform: HOME on Unix, USERPROFILE on Windows (or via Wine).
     final userProfile = Platform.environment['USERPROFILE'] ??
         Platform.environment['HOME'] ??
         '';
     if (portablePath.startsWith('~/')) {
-      return ('$userProfile\\${portablePath.substring(2)}')
-          .replaceAll('/', '\\');
+      return ('$userProfile\\${portablePath.substring(2)}').replaceAll('/', '\\');
     }
     return portablePath.replaceAll('/', '\\');
   }
