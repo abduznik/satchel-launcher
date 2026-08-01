@@ -19,6 +19,8 @@ class SatchelApp extends ConsumerStatefulWidget {
 
 class _SatchelAppState extends ConsumerState<SatchelApp>
     with WidgetsBindingObserver {
+  bool _isClosing = false;
+
   @override
   void initState() {
     super.initState();
@@ -36,10 +38,11 @@ class _SatchelAppState extends ConsumerState<SatchelApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached) {
-      // App is closing — force exit to release all file handles (icudtl.dat, etc.)
-      // This prevents the app from ghosting and locking files.
+    if (state == AppLifecycleState.detached && !_isClosing) {
+      _isClosing = true;
       print('[Satchel] App detached — forcing exit');
+      // Force exit to release all file handles immediately
+      // This prevents ghost processes and locked files (icudtl.dat, etc.)
       exit(0);
     }
   }
