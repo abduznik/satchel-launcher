@@ -81,13 +81,22 @@ class DriveService {
     return portablePath;
   }
 
-  /// Converts an absolute path to ~/ notation if it's under the drive root.
-  /// H:/Games/Foo  →  ~/Games/Foo
-  /// C:/Users/me   →  C:/Users/me  (outside drive, kept absolute)
+  /// Converts an absolute path to ~/ notation if it's on the same drive.
+  /// Compares against appDir (which is always on the drive) to find the
+  /// common root, then makes the path relative from driveRoot.
+  ///
+  /// H:/Games/Foo        →  ~/Games/Foo
+  /// Z:/Volumes/H/Games  →  ~/Games
+  /// ~/apps/mygames      →  ~/apps/mygames  (already portable)
+  /// C:/Users/me         →  C:/Users/me     (different drive, kept absolute)
   static String toPortable(String absolutePath) {
+    if (absolutePath.startsWith('~/')) return absolutePath;
+
     final normPath = absolutePath.replaceAll('\\', '/').toLowerCase();
     final normRoot = driveRoot.replaceAll('\\', '/').toLowerCase();
+    final normAppDir = appDir.replaceAll('\\', '/').toLowerCase();
 
+    // Strategy 1: Match against driveRoot (works on native Windows)
     if (normPath.startsWith(normRoot)) {
       var rel = absolutePath.substring(driveRoot.length);
       if (rel.startsWith('\\') || rel.startsWith('/')) {
@@ -95,8 +104,54 @@ class DriveService {
       }
       return '~/${rel.replaceAll('\\', '/')}';
     }
-    // Outside drive root — return as-is
+
+    // Strategy 2: Match against appDir's root (works on Wine where
+    // driveRoot is Z:\Volumes\H\ but user picks H:\Games via Wine picker)
+    // Find the root by getting the drive letter or mount prefix.
+    final appDirDrive = _getDrivePrefix(normAppDir);
+    final pathDrive = _getDrivePrefix(normPath);
+
+    if (appDirDrive.isNotEmpty && pathDrive == appDirDrive) {
+      // Same drive — make relative from driveRoot
+      // Find where the path overlaps with the drive root structure
+      final normDriveRoot = _findDriveRootForPath(normPath, normAppDir);
+      if (normDriveRoot.isNotEmpty && normPath.startsWith(normDriveRoot)) {
+        var rel = absolutePath.substring(normDriveRoot.length);
+        if (rel.startsWith('\\') || rel.startsWith('/')) {
+          rel = rel.substring(1);
+        }
+        return '~/${rel.replaceAll('\\', '/')}';
+      }
+    }
+
+    // Outside drive — return as-is
     return absolutePath.replaceAll('\\', '/');
+  }
+
+  /// Gets the drive prefix (e.g., "h:/" from "h:/games/foo" or "z:/volumes/h/" from "z:/volumes/h/games")
+  static String _getDrivePrefix(String normPath) {
+    // Windows: "h:/" or "h:\"
+    final winMatch = RegExp(r'^([a-z]:[/\\])').firstMatch(normPath);
+    if (winMatch != null) return winMatch.group(1)!;
+
+    // Unix: "/volumes/h/" or "/mnt/h/"
+    final unixMatch = RegExp(r'^(/[^/]+/[^/]+)').firstMatch(normPath);
+    if (unixMatch != null) return unixMatch.group(1)!;
+
+    return '';
+  }
+
+  /// Finds the drive root by walking up from appDir looking for overlap with the path.
+  static String _findDriveRootForPath(String normPath, String normAppDir) {
+    var dir = normAppDir;
+    for (var i = 0; i < 10; i++) {
+      if (normPath.startsWith(dir)) return dir;
+      final parent = p.dirname(dir);
+      if (parent == dir) break;
+      dir = parent;
+    }
+    // Fallback: use driveRoot
+    return driveRoot.replaceAll('\\', '/').toLowerCase();
   }
 
   static String get configPath => p.join(driveRoot, 'Config');

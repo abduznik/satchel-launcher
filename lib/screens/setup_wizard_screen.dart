@@ -32,8 +32,9 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   @override
   void initState() {
     super.initState();
-    _gamesPath = p.join(p.dirname(DriveService.appDir), 'Games');
-    _savesPath = p.join(p.dirname(DriveService.appDir), 'Saves');
+    // Default paths use ~/ notation — portable across PCs and mount points
+    _gamesPath = '~/Games';
+    _savesPath = '~/Saves';
     print('[SetupWizard] Default games: $_gamesPath');
     print('[SetupWizard] Default saves: $_savesPath');
   }
@@ -51,9 +52,11 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   Future<void> _pickFolder(String field) async {
     final result = await FilePicker.getDirectoryPath(dialogTitle: 'Select $field directory');
     if (result != null && mounted) {
+      // Convert picked absolute path to ~/ notation for portability
+      final portable = DriveService.toPortable(result);
       setState(() {
-        if (field == 'Games') _gamesPath = result;
-        if (field == 'Saves') _savesPath = result;
+        if (field == 'Games') _gamesPath = portable;
+        if (field == 'Saves') _savesPath = portable;
       });
     }
   }

@@ -27,14 +27,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (result != null && mounted) {
       final settings = ref.read(settingsProvider);
+      // Convert to ~/ notation for portability
+      final portable = DriveService.toPortable(result);
       if (field == 'Games') {
         await ref.read(settingsProvider.notifier).updateSettings(
-              settings.copyWith(gamesPath: result),
+              settings.copyWith(gamesPath: portable),
             );
         ref.invalidate(gameScannerProvider);
       } else {
         await ref.read(settingsProvider.notifier).updateSettings(
-              settings.copyWith(savesPath: result),
+              settings.copyWith(savesPath: portable),
             );
       }
     }
@@ -104,13 +106,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _PathRow(
                             label: 'Games folder',
                             description: 'Where your game folders are stored',
-                            path: settings.resolvedGamesPath,
+                            path: settings.gamesPath,
                             onBrowse: () => _pickDirectory('Games'),
                           ),
                           _PathRow(
                             label: 'Saves folder',
                             description: 'Root folder for OmniSave backups',
-                            path: settings.resolvedSavesPath,
+                            path: settings.savesPath,
                             onBrowse: () => _pickDirectory('Saves'),
                           ),
                           _InfoRow(label: 'Config', value: DriveService.configPath),

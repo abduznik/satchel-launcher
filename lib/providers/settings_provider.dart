@@ -34,7 +34,6 @@ class AppSettings {
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
-    // Handle both legacy absolute paths and new ~/ paths
     var gamesPath = json['gamesPath'] ?? '';
     var savesPath = json['savesPath'] ?? '';
 
