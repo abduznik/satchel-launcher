@@ -3,27 +3,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
-import '../services/drive_service.dart';
+import 'services/drive_service.dart';
 import 'app/app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Step 1: Kill orphaned processes
-  _killOrphanedProcesses();
-
-  // Step 2: Wait for all old processes to fully die
-  await _waitForProcessCleanup();
-
-  // Step 3: Init Hive and app
+  // Ensure config directory exists FIRST so PID file can be read/written
   final hiveDir = Directory(DriveService.configPath);
   if (!await hiveDir.exists()) await hiveDir.create(recursive: true);
 
+  // Kill orphaned processes from previous sessions
+  _killOrphanedProcesses();
+
+  // Init Hive
   Hive.init(hiveDir.path);
   await Hive.openBox('settings');
   await Hive.openBox('games');
   await DriveService.ensureDirectories();
 
+  // Write current PID so next startup can kill us if we ghost
   _writePidFile();
 
   runApp(
@@ -33,93 +32,45 @@ void main() async {
   );
 }
 
-/// Kills orphaned satchel.exe and OmniSave.exe processes.
+/// Kills any orphaned satchel.exe from a previous session using a PID file.
 void _killOrphanedProcesses() {
   try {
     if (!Platform.isWindows) return;
-    Process.runSync('taskkill', ['/F', '/IM', 'OmniSave.exe']);
-    Process.runSync('taskkill', ['/IM', 'satchel.exe', '/F']);
-  } catch (_) {}
-}
 
-/// Waits for all satchel.exe processes (except current) to fully die.
-Future<void> _waitForProcessCleanup() async {
-  if (!Platform.isWindows) return;
+    // Kill leftover OmniSave
+    Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
 
-  final currentPid = _getCurrentPid();
-
-  for (var i = 0; i < 50; i++) {
-    final pids = _getRunningPids('satchel.exe');
-    pids.removeWhere((pid) => pid == currentPid);
-
-    if (pids.isEmpty) return;
-
-    print('[Satchel] Waiting for orphaned PIDs to die: $pids');
-    await Future.delayed(const Duration(milliseconds: 100));
-  }
-
-  print('[Satchel] Timeout waiting for cleanup, proceeding anyway');
-}
-
-/// Gets the current process PID.
-/// Uses multiple strategies for compatibility (Windows native, Wine, etc.)
-int _getCurrentPid() {
-  // Strategy 1: wmic (works on native Windows and most Wine setups)
-  try {
-    final result = Process.runSync('wmic', [
-      'process', 'where', 'name="satchel.exe"', 'get', 'ProcessId', '/format:list'
-    ]);
-    final output = result.stdout.toString();
-    final pids = <int>[];
-    for (final match in RegExp(r'ProcessId=(\d+)').allMatches(output)) {
-      final pid = int.tryParse(match.group(1)!);
-      if (pid != null) pids.add(pid);
-    }
-    if (pids.isNotEmpty) return pids.last; // Newest PID is usually current
-  } catch (_) {}
-
-  // Strategy 2: tasklist + parse (fallback if wmic fails under Wine)
-  try {
-    final result = Process.runSync('tasklist', [
-      '/FI', 'IMAGENAME eq satchel.exe', '/NH'
-    ]);
-    final output = result.stdout.toString();
-    final pids = <int>[];
-    for (final match in RegExp(r'satchel\.exe\s+(\d+)').allMatches(output)) {
-      final pid = int.tryParse(match.group(1)!);
-      if (pid != null) pids.add(pid);
-    }
-    if (pids.isNotEmpty) return pids.last;
-  } catch (_) {}
-
-  return 0;
-}
-
-/// Gets all PIDs for a given process name.
-List<int> _getRunningPids(String processName) {
-  final pids = <int>[];
-  try {
-    final result = Process.runSync('tasklist', [
-      '/FI', 'IMAGENAME eq $processName', '/NH'
-    ]);
-    final output = result.stdout.toString();
-    for (final match in RegExp(r'(\d+)\s+\S+\s+\d+').allMatches(output)) {
-      final pid = int.tryParse(match.group(1)!);
-      if (pid != null) pids.add(pid);
+    // Kill orphaned satchel.exe from previous session via PID file
+    final pidFile = File(p.join(DriveService.configPath, 'satchel.pid'));
+    if (pidFile.existsSync()) {
+      final oldPid = int.tryParse(pidFile.readAsStringSync().trim());
+      if (oldPid != null) {
+        final result = Process.runSync('tasklist', ['/FI', 'PID eq $oldPid', '/NH']);
+        final output = result.stdout.toString();
+        if (output.contains('$oldPid') && !output.contains('INFO:')) {
+          print('[Satchel] Killing orphaned process PID: $oldPid');
+          Process.runSync('taskkill', ['/F', '/PID', '$oldPid']);
+        }
+      }
+      pidFile.deleteSync();
     }
   } catch (_) {}
-  return pids;
 }
 
-/// Writes current PID for next startup.
+/// Writes current PID to a file so next startup can clean up if we ghost.
 void _writePidFile() {
   try {
     if (!Platform.isWindows) return;
-    final pid = _getCurrentPid();
-    if (pid > 0) {
+    // Get current PID using wmic (faster and more reliable than PowerShell)
+    final result = Process.runSync('wmic', ['process', 'where', 'name="satchel.exe"', 'get', 'ProcessId', '/format:list']);
+    final output = result.stdout.toString();
+    // Parse "ProcessId=12345"
+    final match = RegExp(r'ProcessId=(\d+)').firstMatch(output);
+    if (match != null) {
+      final pid = match.group(1);
       final pidFile = File(p.join(DriveService.configPath, 'satchel.pid'));
-      pidFile.writeAsStringSync('$pid');
-      print('[Satchel] Wrote PID: $pid');
+      pidFile.writeAsStringSync(pid!);
+      print('[Satchel] Wrote PID file: $pid');
     }
   } catch (_) {}
 }

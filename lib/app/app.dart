@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,14 +18,16 @@ class SatchelApp extends ConsumerStatefulWidget {
 
 class _SatchelAppState extends ConsumerState<SatchelApp>
     with WidgetsBindingObserver {
-  bool _isClosing = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(gamepadServiceProvider);
+      try {
+        ref.read(gamepadServiceProvider);
+      } catch (_) {
+        print('[Satchel] Gamepad service unavailable');
+      }
     });
   }
 
@@ -34,17 +35,6 @@ class _SatchelAppState extends ConsumerState<SatchelApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached && !_isClosing) {
-      _isClosing = true;
-      print('[Satchel] App detached — forcing exit');
-      // Force exit to release all file handles immediately
-      // This prevents ghost processes and locked files (icudtl.dat, etc.)
-      exit(0);
-    }
   }
 
   @override
