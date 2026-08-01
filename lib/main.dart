@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
-import 'services/drive_service.dart';
+import '../services/drive_service.dart';
 import 'app/app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Step 1: Kill orphaned processes from previous sessions
+  // Step 1: Kill orphaned processes
   _killOrphanedProcesses();
 
-  // Step 2: Wait for all old satchel processes to fully die
+  // Step 2: Wait for all old processes to fully die
   await _waitForProcessCleanup();
 
   // Step 3: Init Hive and app
@@ -33,7 +33,7 @@ void main() async {
   );
 }
 
-/// Kills orphaned processes.
+/// Kills orphaned satchel.exe and OmniSave.exe processes.
 void _killOrphanedProcesses() {
   try {
     if (!Platform.isWindows) return;
@@ -43,7 +43,6 @@ void _killOrphanedProcesses() {
 }
 
 /// Waits for all satchel.exe processes (except current) to fully die.
-/// Polls tasklist every 100ms, gives up after 5 seconds.
 Future<void> _waitForProcessCleanup() async {
   if (!Platform.isWindows) return;
 
@@ -51,10 +50,9 @@ Future<void> _waitForProcessCleanup() async {
 
   for (var i = 0; i < 50; i++) {
     final pids = _getRunningPids('satchel.exe');
-    // Remove current process from the list
     pids.removeWhere((pid) => pid == currentPid);
 
-    if (pids.isEmpty) return; // No other satchel processes — we're good
+    if (pids.isEmpty) return;
 
     print('[Satchel] Waiting for orphaned PIDs to die: $pids');
     await Future.delayed(const Duration(milliseconds: 100));
@@ -64,22 +62,37 @@ Future<void> _waitForProcessCleanup() async {
 }
 
 /// Gets the current process PID.
+/// Uses multiple strategies for compatibility (Windows native, Wine, etc.)
 int _getCurrentPid() {
+  // Strategy 1: wmic (works on native Windows and most Wine setups)
   try {
     final result = Process.runSync('wmic', [
       'process', 'where', 'name="satchel.exe"', 'get', 'ProcessId', '/format:list'
     ]);
     final output = result.stdout.toString();
-    // wmic returns ALL satchel PIDs — the last one is usually the newest (current)
     final pids = <int>[];
     for (final match in RegExp(r'ProcessId=(\d+)').allMatches(output)) {
       final pid = int.tryParse(match.group(1)!);
       if (pid != null) pids.add(pid);
     }
-    return pids.isNotEmpty ? pids.last : 0;
-  } catch (_) {
-    return 0;
-  }
+    if (pids.isNotEmpty) return pids.last; // Newest PID is usually current
+  } catch (_) {}
+
+  // Strategy 2: tasklist + parse (fallback if wmic fails under Wine)
+  try {
+    final result = Process.runSync('tasklist', [
+      '/FI', 'IMAGENAME eq satchel.exe', '/NH'
+    ]);
+    final output = result.stdout.toString();
+    final pids = <int>[];
+    for (final match in RegExp(r'satchel\.exe\s+(\d+)').allMatches(output)) {
+      final pid = int.tryParse(match.group(1)!);
+      if (pid != null) pids.add(pid);
+    }
+    if (pids.isNotEmpty) return pids.last;
+  } catch (_) {}
+
+  return 0;
 }
 
 /// Gets all PIDs for a given process name.
