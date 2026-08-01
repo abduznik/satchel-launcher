@@ -116,19 +116,24 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     for (final game in games) {
       if (!mounted) return;
 
-      // Skip entirely if cover already exists on disk — metadata was already fetched.
-      final existingCover = File(p.join(game.folderPath, '.indie', 'cover.jpg'));
-      if (game.coverPath != null || await existingCover.exists()) {
-        // Just wire the path in-memory if it wasn't set
-        if (game.coverPath == null && await existingCover.exists()) {
-          await updateGame(game.copyWith(coverPath: existingCover.path));
+      // Skip if game already has cover AND banner on disk — fully fetched
+      final coverFile = File(p.join(game.folderPath, '.indie', 'cover.jpg'));
+      final bannerFile = File(p.join(game.folderPath, '.indie', 'banner.jpg'));
+      final hasCover = game.coverPath != null || await coverFile.exists();
+
+      if (hasCover) {
+        // Wire up path if missing
+        if (game.coverPath == null && await coverFile.exists()) {
+          await updateGame(game.copyWith(coverPath: coverFile.path));
+        }
+        if (game.bannerPath == null && await bannerFile.exists()) {
+          await updateGame(game.copyWith(bannerPath: bannerFile.path));
         }
         print('[ArtworkFetch] ${game.name} — already has cover, skipping');
         continue;
       }
 
-      // No cover at all — search and fetch full metadata (cover + banner +
-      // summary + genres + screenshots). Uses IGDB first, SteamGridDB as fallback.
+      // No cover — fetch full metadata
       print('[ArtworkFetch] Fetching full metadata for ${game.name}...');
       try {
         final candidates = await fetchService.searchCandidates(game.name);
@@ -154,7 +159,7 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
       }
 
       // Respect API rate limits
-      await Future.delayed(const Duration(milliseconds: 600));
+      await Future.delayed(const Duration(milliseconds: 800));
     }
   }
 

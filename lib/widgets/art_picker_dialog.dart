@@ -110,6 +110,8 @@ class _ArtPickerDialogState extends ConsumerState<ArtPickerDialog> {
     // Persist everything to meta.json so it survives rescan (offline use)
     await _saveMetaJson(updatedGame);
 
+    // Small delay to let the provider state propagate before closing
+    await Future.delayed(const Duration(milliseconds: 100));
     if (mounted) Navigator.of(context).pop(true);
   }
 
