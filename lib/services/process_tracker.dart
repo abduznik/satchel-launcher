@@ -13,9 +13,30 @@ class ProcessTracker {
   ProcessTracker({this.onExit});
 
   /// Attaches to an already-started process.
-  void attach(Process process) {
+  ///
+  /// Uses the process's own [Process.exitCode] as the primary exit signal
+  /// (instant and reliable for processes we started natively), plus the
+  /// PID/name polling as a fallback for Wine/cmd `/c start` cases where the
+  /// returned process exits but the actual game keeps running under a new PID.
+  void attach(Process process, {String? name}) {
     _pid = process.pid;
+    _processName = name ?? _processName;
     _startTracking();
+
+    process.exitCode.then((_) {
+      if (_exited) return;
+      print('[ProcessTracker] Attached process exited (PID: $_pid)');
+      // The launched process object exited. It may be a launcher/cmd wrapper
+      // while the real game is still running — if we know the name, search
+      // for it before declaring the game stopped.
+      if (_processName != null) {
+        _searchByName(_processName!);
+      } else {
+        _markExited();
+      }
+    }).catchError((_) {
+      // exitCode future failed (e.g. detached process) — rely on polling.
+    });
   }
 
   /// Attaches by PID and process name (for tracking game.exe after OmniSave launches it).
@@ -81,20 +102,24 @@ class ProcessTracker {
   /// Searches for a process by name (e.g. "game.exe") and updates the tracked PID.
   void _searchByName(String name) async {
     try {
-      final result = await Process.run('tasklist', ['/FI', 'IMAGENAME eq $name', '/NH']);
+      final result =
+          await Process.run('tasklist', ['/FI', 'IMAGENAME eq $name', '/NH']);
       final output = result.stdout.toString();
       if (output.contains(name) && !output.contains('INFO:')) {
-        // Found it — extract the new PID
+        // Found it — extract the (possibly new) PID
         final lines = output.split('\n');
         for (final line in lines) {
           if (line.toLowerCase().contains(name.toLowerCase())) {
             final parts = line.trim().split(RegExp(r'\s+'));
             if (parts.length >= 2) {
-              final newPid = int.tryParse(parts[1]);
-              if (newPid != null && newPid != _pid) {
-                print('[ProcessTracker] Found $name with new PID: $newPid (was $_pid)');
-                _pid = newPid;
-                return; // Still alive with new PID
+              final foundPid = int.tryParse(parts[1]);
+              if (foundPid != null) {
+                if (foundPid != _pid) {
+                  print(
+                      '[ProcessTracker] Found $name with new PID: $foundPid (was $_pid)');
+                }
+                _pid = foundPid;
+                return; // Still alive
               }
             }
           }

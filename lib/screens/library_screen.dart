@@ -13,6 +13,7 @@ import '../providers/theme_provider.dart';
 import '../providers/ui_provider.dart';
 import '../services/platform_service.dart';
 import '../services/game_launch_service.dart';
+import '../widgets/activity_panel.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/focus_effect_wrapper.dart';
@@ -40,7 +41,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   void initState() {
     super.initState();
     _focusNode = FocusNode();
-    _isListView = Hive.box('settings').get('isListView', defaultValue: false) as bool;
+    _isListView =
+        Hive.box('settings').get('isListView', defaultValue: false) as bool;
   }
 
   @override
@@ -80,172 +82,202 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           if (event is KeyDownEvent) {
             if (event.logicalKey == LogicalKeyboardKey.f5) {
               ref.read(gameLibraryProvider.notifier).rescan();
-            } else if (event.logicalKey == LogicalKeyboardKey.escape && _searchOpen) {
+            } else if (event.logicalKey == LogicalKeyboardKey.escape &&
+                _searchOpen) {
               _toggleSearch();
             }
           }
         },
-        child: Row(
+        child: Stack(
           children: [
-            // ── Sidebar ──────────────────────────────────────────────────
-            _Sidebar(
-              gameCount: ref.read(gameLibraryProvider).valueOrNull?.length,
-              isListView: _isListView,
-              onToggleView: (listView) {
-                setState(() {
-                  _isListView = listView;
-                  if (!listView) _selectedGame = null;
-                });
-                Hive.box('settings').put('isListView', listView);
-              },
-              onRescan: () => ref.read(gameLibraryProvider.notifier).rescan(),
-              onSettings: () => Navigator.of(context).pushNamed('/settings'),
-              onSearch: _toggleSearch,
-              searchActive: _searchOpen,
-            ),
+            Row(
+              children: [
+                // ── Sidebar ──────────────────────────────────────────────────
+                _Sidebar(
+                  gameCount: ref.read(gameLibraryProvider).valueOrNull?.length,
+                  isListView: _isListView,
+                  onToggleView: (listView) {
+                    setState(() {
+                      _isListView = listView;
+                      if (!listView) _selectedGame = null;
+                    });
+                    Hive.box('settings').put('isListView', listView);
+                  },
+                  onRescan: () =>
+                      ref.read(gameLibraryProvider.notifier).rescan(),
+                  onSettings: () =>
+                      Navigator.of(context).pushNamed('/settings'),
+                  onSearch: _toggleSearch,
+                  searchActive: _searchOpen,
+                ),
 
-            // ── Divider ──────────────────────────────────────────────────
-            VerticalDivider(
-              width: 1,
-              color: cs.outline.withValues(alpha: 0.12),
-            ),
+                // ── Divider ──────────────────────────────────────────────────
+                VerticalDivider(
+                  width: 1,
+                  color: cs.outline.withValues(alpha: 0.12),
+                ),
 
-            // ── Main content ─────────────────────────────────────────────
-            Expanded(
-              child: Column(
-                children: [
-                  // ── Sliding search bar ────────────────────────────────
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    child: _searchOpen
-                        ? Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-                            decoration: BoxDecoration(
-                              color: cs.surface,
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: cs.outline.withValues(alpha: 0.1),
+                // ── Main content ─────────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    children: [
+                      // ── Sliding search bar ────────────────────────────────
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        child: _searchOpen
+                            ? Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                                decoration: BoxDecoration(
+                                  color: cs.surface,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: cs.outline.withValues(alpha: 0.1),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.search_rounded,
+                                      size: 20,
+                                      color: cs.primary,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _searchController,
+                                        focusNode: _searchFocusNode,
+                                        style: TextStyle(
+                                          color: cs.onSurface,
+                                          fontSize: 14,
+                                        ),
+                                        onChanged: (val) {
+                                          ref
+                                              .read(
+                                                  searchQueryProvider.notifier)
+                                              .state = val;
+                                        },
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              'Search games by name, genre, developer...',
+                                          hintStyle: TextStyle(
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.35),
+                                            fontSize: 14,
+                                          ),
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                      ),
+                                    ),
+                                    if (searchQuery.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: () {
+                                          _searchController.clear();
+                                          ref
+                                              .read(
+                                                  searchQueryProvider.notifier)
+                                              .state = '';
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 14,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: _toggleSearch,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: cs.onSurface
+                                              .withValues(alpha: 0.08),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Icon(
+                                          Icons.keyboard_hide_rounded,
+                                          size: 16,
+                                          color: cs.onSurface
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+
+                      // ── Games content ────────────────────────────────────
+                      Expanded(
+                        child: gamesAsync.when(
+                          loading: () => Center(
+                            child: CircularProgressIndicator(
+                              color: cs.primary,
+                              strokeWidth: 2,
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.search_rounded,
-                                  size: 20,
-                                  color: cs.primary,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    focusNode: _searchFocusNode,
-                                    style: TextStyle(
-                                      color: cs.onSurface,
-                                      fontSize: 14,
-                                    ),
-                                    onChanged: (val) {
-                                      ref.read(searchQueryProvider.notifier).state = val;
-                                    },
-                                    decoration: InputDecoration(
-                                      hintText: 'Search games by name, genre, developer...',
-                                      hintStyle: TextStyle(
-                                        color: cs.onSurface.withValues(alpha: 0.35),
-                                        fontSize: 14,
-                                      ),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                                if (searchQuery.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: () {
-                                      _searchController.clear();
-                                      ref.read(searchQueryProvider.notifier).state = '';
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: cs.onSurface.withValues(alpha: 0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.close,
-                                        size: 14,
-                                        color: cs.onSurface.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: _toggleSearch,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: cs.onSurface.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.keyboard_hide_rounded,
-                                      size: 16,
-                                      color: cs.onSurface.withValues(alpha: 0.4),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-
-                  // ── Games content ────────────────────────────────────
-                  Expanded(
-                    child: gamesAsync.when(
-                      loading: () => Center(
-                        child: CircularProgressIndicator(
-                          color: cs.primary,
-                          strokeWidth: 2,
+                          ),
+                          error: (error, _) => _ErrorState(
+                            error: error.toString(),
+                            onRetry: () =>
+                                ref.read(gameLibraryProvider.notifier).rescan(),
+                          ),
+                          data: (games) {
+                            if (games.isEmpty) {
+                              if (searchQuery.isNotEmpty) {
+                                return _NoSearchResults(query: searchQuery);
+                              }
+                              return _EmptyState(
+                                onRescan: () => ref
+                                    .read(gameLibraryProvider.notifier)
+                                    .rescan(),
+                              );
+                            }
+                            if (_isListView) {
+                              // Auto-select first game if none selected
+                              final selected = _selectedGame != null
+                                  ? games.firstWhere(
+                                      (g) => g.id == _selectedGame!.id,
+                                      orElse: () => games.first,
+                                    )
+                                  : games.first;
+                              return _ListDetailView(
+                                games: games,
+                                selectedGame: selected,
+                                onSelectGame: (g) =>
+                                    setState(() => _selectedGame = g),
+                              );
+                            }
+                            return GameGrid(games: games);
+                          },
                         ),
                       ),
-                      error: (error, _) => _ErrorState(
-                        error: error.toString(),
-                        onRetry: () => ref.read(gameLibraryProvider.notifier).rescan(),
-                      ),
-                      data: (games) {
-                        if (games.isEmpty) {
-                          if (searchQuery.isNotEmpty) {
-                            return _NoSearchResults(query: searchQuery);
-                          }
-                          return _EmptyState(
-                            onRescan: () => ref.read(gameLibraryProvider.notifier).rescan(),
-                          );
-                        }
-                        if (_isListView) {
-                          // Auto-select first game if none selected
-                          final selected = _selectedGame != null
-                              ? games.firstWhere(
-                                  (g) => g.id == _selectedGame!.id,
-                                  orElse: () => games.first,
-                                )
-                              : games.first;
-                          return _ListDetailView(
-                            games: games,
-                            selectedGame: selected,
-                            onSelectGame: (g) => setState(() => _selectedGame = g),
-                          );
-                        }
-                        return GameGrid(games: games);
-                      },
-                    ),
+                      if (inputMode == InputMode.gamepad)
+                        ControllerHintsBar(inputMode: inputMode),
+                    ],
                   ),
-                  if (inputMode == InputMode.gamepad)
-                    ControllerHintsBar(inputMode: inputMode),
-                ],
-              ),
+                ),
+              ],
+            ),
+            const Positioned(
+              right: 16,
+              bottom: 16,
+              child: ActivityPanel(),
             ),
           ],
         ),
@@ -306,7 +338,8 @@ class _Sidebar extends ConsumerWidget {
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 22),
+                child: const Icon(Icons.diamond_rounded,
+                    color: Colors.white, size: 22),
               ),
             ),
           ),
@@ -510,7 +543,8 @@ class _SidebarIconButtonState extends ConsumerState<_SidebarIconButton> {
                       : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
               border: isActive
-                  ? Border.all(color: cs.primary.withValues(alpha: 0.4), width: 1)
+                  ? Border.all(
+                      color: cs.primary.withValues(alpha: 0.4), width: 1)
                   : null,
             ),
             child: Icon(
@@ -638,10 +672,8 @@ class _GameListRowState extends ConsumerState<_GameListRow> {
   @override
   Widget build(BuildContext context) {
     final cs = ref.watch(themeProvider).theme.colorScheme;
-    final recentlyPlayed = DateTime.now()
-            .difference(widget.game.lastPlayed)
-            .inDays <
-        7;
+    final recentlyPlayed =
+        DateTime.now().difference(widget.game.lastPlayed).inDays < 7;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -780,7 +812,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('${currentPlaying.game.name} is running'),
-          content: Text('Stop ${currentPlaying.game.name} and launch ${game.name}?'),
+          content:
+              Text('Stop ${currentPlaying.game.name} and launch ${game.name}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -809,7 +842,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
     bool omnisaveConfigured = false;
     if (await metaFile.exists()) {
       try {
-        final meta = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
+        final meta =
+            jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
         omnisaveConfigured = meta['omnisaveConfigured'] == true;
       } catch (_) {}
     }
@@ -859,7 +893,9 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
         title: const Text('Open Video'),
         content: Text('"$title" will open in your default browser.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(ctx, true),
             icon: const Icon(Icons.open_in_browser, size: 16),
@@ -876,14 +912,20 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
   @override
   Widget build(BuildContext context) {
     // Read live data from provider so art updates are reflected
-    final liveGame = ref.watch(gameLibraryProvider).valueOrNull
-            ?.firstWhere((g) => g.id == widget.game.id, orElse: () => widget.game) ??
+    final liveGame = ref.watch(gameLibraryProvider).valueOrNull?.firstWhere(
+            (g) => g.id == widget.game.id,
+            orElse: () => widget.game) ??
         widget.game;
 
     final cs = ref.watch(themeProvider).theme.colorScheme;
     final meta = liveGame.metadata;
     final hasBanner = liveGame.bannerPath != null;
     final hasCover = liveGame.coverPath != null;
+
+    // Live playing state — shows STOP while this game is running
+    final playing = ref.watch(playingGameProvider);
+    final isThisGamePlaying = playing != null && playing.game.id == liveGame.id;
+    final isLaunching = _isLaunching && !isThisGamePlaying;
 
     return SingleChildScrollView(
       child: Column(
@@ -900,8 +942,7 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                     ? Image.file(
                         File(liveGame.bannerPath!),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            _bannerPlaceholder(cs),
+                        errorBuilder: (_, __, ___) => _bannerPlaceholder(cs),
                       )
                     : hasCover
                         ? Image.file(
@@ -1005,8 +1046,10 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 9, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: cs.primary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(10),
+                                          color: cs.primary
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                         ),
                                         child: Text(
                                           g,
@@ -1041,13 +1084,19 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // PLAY button
+                  // PLAY / STOP button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _isLaunching ? null : () => _launchGame(liveGame),
+                      onPressed: isLaunching
+                          ? null
+                          : (isThisGamePlaying
+                              ? () => stopCurrentGame(ref)
+                              : () => _launchGame(liveGame)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
+                        backgroundColor: isThisGamePlaying
+                            ? const Color(0xFFDC2626)
+                            : cs.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -1055,20 +1104,28 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                         ),
                         elevation: 0,
                       ),
-                      icon: _isLaunching
+                      icon: isLaunching
                           ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Icon(Icons.play_arrow_rounded, size: 26),
+                          : Icon(
+                              isThisGamePlaying
+                                  ? Icons.stop_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 26,
+                            ),
                       label: Text(
-                        _isLaunching
-                            ? (_launchStatus.isNotEmpty ? _launchStatus.toUpperCase() : 'LAUNCHING...')
-                            : 'PLAY',
+                        isLaunching
+                            ? (_launchStatus.isNotEmpty
+                                ? _launchStatus.toUpperCase()
+                                : 'LAUNCHING...')
+                            : (isThisGamePlaying ? 'STOP' : 'PLAY'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -1090,7 +1147,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                             builder: (_) => SaveLocationDialog(game: liveGame),
                           ),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: cs.onSurface.withValues(alpha: 0.7),
+                            foregroundColor:
+                                cs.onSurface.withValues(alpha: 0.7),
                             side: BorderSide(
                                 color: cs.outline.withValues(alpha: 0.2)),
                             padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1103,7 +1161,6 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                               style: TextStyle(fontSize: 12)),
                         ),
                       ),
-
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
@@ -1112,7 +1169,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                             builder: (_) => ArtPickerDialog(game: liveGame),
                           ),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: cs.onSurface.withValues(alpha: 0.7),
+                            foregroundColor:
+                                cs.onSurface.withValues(alpha: 0.7),
                             side: BorderSide(
                                 color: cs.outline.withValues(alpha: 0.2)),
                             padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1230,7 +1288,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                         itemBuilder: (ctx, i) {
                           final v = meta.videos[i];
                           return GestureDetector(
-                            onTap: () => _confirmOpenVideo(v.name, v.youtubeUrl),
+                            onTap: () =>
+                                _confirmOpenVideo(v.name, v.youtubeUrl),
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
@@ -1341,7 +1400,8 @@ class _EmptyState extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.folder_open_rounded, size: 72, color: cs.onSurface.withValues(alpha: 0.12)),
+          Icon(Icons.folder_open_rounded,
+              size: 72, color: cs.onSurface.withValues(alpha: 0.12)),
           const SizedBox(height: 20),
           Text('No games found',
               style: TextStyle(
@@ -1350,9 +1410,13 @@ class _EmptyState extends ConsumerWidget {
                   color: cs.onSurface.withValues(alpha: 0.55))),
           const SizedBox(height: 8),
           Text('Add game folders to the Games directory',
-              style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.35))),
+              style: TextStyle(
+                  fontSize: 13, color: cs.onSurface.withValues(alpha: 0.35))),
           const SizedBox(height: 28),
-          _PillButton(label: 'Scan Again', icon: Icons.refresh_rounded, onTap: onRescan),
+          _PillButton(
+              label: 'Scan Again',
+              icon: Icons.refresh_rounded,
+              onTap: onRescan),
         ],
       ),
     );
@@ -1371,14 +1435,19 @@ class _ErrorState extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline_rounded, size: 56, color: cs.error.withValues(alpha: 0.7)),
+          Icon(Icons.error_outline_rounded,
+              size: 56, color: cs.error.withValues(alpha: 0.7)),
           const SizedBox(height: 16),
           Text('Error loading games',
-              style: TextStyle(fontSize: 18, color: cs.onSurface.withValues(alpha: 0.8))),
+              style: TextStyle(
+                  fontSize: 18, color: cs.onSurface.withValues(alpha: 0.8))),
           const SizedBox(height: 8),
-          Text(error, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4))),
+          Text(error,
+              style: TextStyle(
+                  fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4))),
           const SizedBox(height: 24),
-          _PillButton(label: 'Retry', icon: Icons.refresh_rounded, onTap: onRetry),
+          _PillButton(
+              label: 'Retry', icon: Icons.refresh_rounded, onTap: onRetry),
         ],
       ),
     );
@@ -1389,7 +1458,8 @@ class _PillButton extends ConsumerStatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  const _PillButton({required this.label, required this.icon, required this.onTap});
+  const _PillButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
   ConsumerState<_PillButton> createState() => _PillButtonState();
@@ -1417,7 +1487,8 @@ class _PillButtonState extends ConsumerState<_PillButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 16, color: _hovered ? Colors.white : cs.primary),
+              Icon(widget.icon,
+                  size: 16, color: _hovered ? Colors.white : cs.primary),
               const SizedBox(width: 8),
               Text(
                 widget.label,
@@ -1448,7 +1519,8 @@ class _NoSearchResults extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.search_off_rounded, size: 64, color: cs.onSurface.withValues(alpha: 0.12)),
+          Icon(Icons.search_off_rounded,
+              size: 64, color: cs.onSurface.withValues(alpha: 0.12)),
           const SizedBox(height: 16),
           Text(
             'No results for "$query"',

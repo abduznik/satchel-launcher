@@ -9,7 +9,9 @@ class GameScanner {
 
   GameScanner({required this.gamesPath});
 
-  Future<List<Game>> scan() async {
+  Future<List<Game>> scan({
+    void Function(int current, int total, String folderName)? onProgress,
+  }) async {
     print('[GameScanner] Scanning: $gamesPath');
     final gamesDir = Directory(gamesPath);
     if (!await gamesDir.exists()) {
@@ -21,15 +23,19 @@ class GameScanner {
     final entries = await gamesDir.list().toList();
     print('[GameScanner] Found ${entries.length} entries in Games dir');
 
-    for (final entry in entries) {
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      onProgress?.call(i + 1, entries.length, p.basename(entry.path));
       if (entry is Directory) {
         print('[GameScanner] Checking folder: ${p.basename(entry.path)}');
         final game = await _scanFolder(entry.path);
         if (game != null) {
-          print('[GameScanner] ✓ Detected game: ${game.name} → ${game.exePath}');
+          print(
+              '[GameScanner] ✓ Detected game: ${game.name} → ${game.exePath}');
           games.add(game);
         } else {
-          print('[GameScanner] ✗ Skipped: ${p.basename(entry.path)} (no exe found)');
+          print(
+              '[GameScanner] ✗ Skipped: ${p.basename(entry.path)} (no exe found)');
         }
       }
     }
@@ -124,10 +130,23 @@ class GameScanner {
 
     const launchableExtensions = ['.exe', '.bat', '.cmd'];
     const skipList = [
-      'uninstall', 'uninst', 'setup', 'install', 'redist',
-      'vc_redist', 'vcredist', 'directx', 'dxsetup',
-      'dotnet', 'crashreport', 'crashhandler', 'bugsplat',
-      'upc', 'easyanticheat', 'battleye', 'launcher_helper',
+      'uninstall',
+      'uninst',
+      'setup',
+      'install',
+      'redist',
+      'vc_redist',
+      'vcredist',
+      'directx',
+      'dxsetup',
+      'dotnet',
+      'crashreport',
+      'crashhandler',
+      'bugsplat',
+      'upc',
+      'easyanticheat',
+      'battleye',
+      'launcher_helper',
     ];
 
     final exeFiles = <File>[];
@@ -143,11 +162,15 @@ class GameScanner {
 
         // Skip files inside __macosx or _commonredist
         final relPath = entity.path.substring(folderPath.length).toLowerCase();
-        if (relPath.contains('__macosx') || relPath.contains('_commonredist')) continue;
+        if (relPath.contains('__macosx') || relPath.contains('_commonredist')) {
+          continue;
+        }
 
         // Skip known junk executables
         final nameLower = basename.toLowerCase();
-        if (skipList.any((s) => nameLower.contains(s))) continue;
+        if (skipList.any((s) => nameLower.contains(s))) {
+          continue;
+        }
 
         exeFiles.add(entity);
       }
@@ -165,7 +188,9 @@ class GameScanner {
         final exeTokens = _tokenize(p.basenameWithoutExtension(exe.path));
         int score = 0;
         for (final token in hintTokens) {
-          if (exeTokens.any((t) => t.contains(token) || token.contains(t))) score++;
+          if (exeTokens.any((t) => t.contains(token) || token.contains(t))) {
+            score++;
+          }
         }
         if (score > bestScore) {
           bestScore = score;
@@ -177,7 +202,8 @@ class GameScanner {
     }
 
     // Fallback: largest .exe by file size
-    final exes = exeFiles.where((f) => f.path.toLowerCase().endsWith('.exe')).toList();
+    final exes =
+        exeFiles.where((f) => f.path.toLowerCase().endsWith('.exe')).toList();
     final candidates = exes.isNotEmpty ? exes : exeFiles;
 
     File? largest;

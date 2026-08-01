@@ -43,6 +43,62 @@ class MetadataFetchService {
     return results;
   }
 
+  // ---------------------------------------------------------------------------
+  // Name confidence — how confident we are that a search result is this game.
+  // Used by the background auto-fetch so it never applies a wrong match
+  // (e.g. "Dark" (2013) must not be matched to "Thief") and never overwrites
+  // manually-curated metadata.
+  // ---------------------------------------------------------------------------
+
+  /// 0.0–1.0 similarity between the game folder name and a candidate title.
+  /// 1.0 = exact match, ≥0.9 = one contains the other, else Levenshtein +
+  /// word-overlap blended.
+  static double nameConfidence(String gameName, String candidateName) {
+    final a = gameName.toLowerCase().trim();
+    final b = candidateName.toLowerCase().trim();
+    if (a.isEmpty || b.isEmpty) return 0.0;
+    if (a == b) return 1.0;
+    if (a.contains(b) || b.contains(a)) return 0.9;
+
+    final distance = _levenshtein(a, b);
+    final maxLen = a.length > b.length ? a.length : b.length;
+    if (maxLen == 0) return 0.0;
+    final similarity = 1.0 - (distance / maxLen);
+
+    final aWords = a.split(RegExp(r'\s+')).where((w) => w.length > 1).toSet();
+    final bWords = b.split(RegExp(r'\s+')).where((w) => w.length > 1).toSet();
+    final denom = aWords.length > bWords.length ? aWords.length : bWords.length;
+    final wordBonus = denom == 0 ? 0.0 : aWords.intersection(bWords).length / denom;
+
+    return (similarity * 0.7 + wordBonus * 0.3).clamp(0.0, 1.0);
+  }
+
+  /// Minimum confidence for the auto-fetch to apply a candidate automatically.
+  static const double autoApplyThreshold = 0.75;
+
+  static int _levenshtein(String a, String b) {
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    final dp = List.generate(a.length + 1, (i) => List.generate(b.length + 1, (j) => 0));
+    for (var i = 0; i <= a.length; i++) {
+      dp[i][0] = i;
+    }
+    for (var j = 0; j <= b.length; j++) {
+      dp[0][j] = j;
+    }
+    for (var i = 1; i <= a.length; i++) {
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        dp[i][j] = [
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost,
+        ].reduce((x, y) => x < y ? x : y);
+      }
+    }
+    return dp[a.length][b.length];
+  }
+
   /// Fetch full metadata + images for a selected result and save to disk.
   /// If [clearOld] is true, deletes existing cover/banner/screenshots first.
   Future<FetchedGameData> fetchFull(

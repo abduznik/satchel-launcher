@@ -156,12 +156,15 @@ class _MetadataEditorDialogState extends ConsumerState<MetadataEditorDialog> {
         } catch (_) {}
       }
 
-      // Merge metadata into existing
+      // Merge metadata into existing — flattened at the TOP level, matching
+      // what the scanner expects when it reads meta.json back. (Nesting under
+      // a "metadata" key would be silently lost on the next rescan.)
       existing['name'] = game.name;
       existing['coverPath'] = game.coverPath;
       existing['bannerPath'] = game.bannerPath;
+      existing['autoScanned'] = true;
       if (game.metadata != null) {
-        existing['metadata'] = game.metadata!.toJson();
+        existing.addAll(game.metadata!.toJson());
       }
 
       await metaFile.writeAsString(

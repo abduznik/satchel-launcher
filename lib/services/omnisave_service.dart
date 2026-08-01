@@ -20,7 +20,8 @@ class OmniSaveService {
     if (await destFile.exists()) return destFile.path;
     try {
       final data = await rootBundle.load('thirdparty/OmniSave.exe');
-      final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      final bytes =
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       await destFile.writeAsBytes(bytes);
       print('[OmniSave] Extracted OmniSave.exe to ${destFile.path}');
       return destFile.path;
@@ -40,8 +41,11 @@ class OmniSaveService {
       await indieDir.create(recursive: true);
     }
 
-    // Just the exe filename — OmniSave sets working dir to the game folder and launches from there
-    final exeName = p.basename(game.exePath);
+    // Relative path from the game folder to the exe (e.g. "bin/game.exe").
+    // OmniSave sets its working dir to the game folder, so a game whose
+    // binary lives in a subfolder must be launched with the relative path,
+    // not just the bare filename.
+    final relExe = p.relative(game.exePath, from: game.folderPath);
     final gameSavesDir = p.join(savesBasePath, game.name);
 
     String resolvedLocalPath;
@@ -52,7 +56,7 @@ class OmniSaveService {
     }
 
     final iniContent = '[OmniSave]\n'
-        'Launch_Command=$exeName\n'
+        'Launch_Command=$relExe\n'
         'Launch_Args=${gameArgs ?? ''}\n'
         'Local_Path=$resolvedLocalPath\n'
         'Remote_Path=$gameSavesDir\n';
@@ -84,12 +88,14 @@ class OmniSaveService {
     String? localSavePath,
     String? gameArgs,
   }) async {
-    await generateConfig(game, localSavePath: localSavePath, gameArgs: gameArgs);
+    await generateConfig(game,
+        localSavePath: localSavePath, gameArgs: gameArgs);
 
     // Extract OmniSave.exe into the game folder — it must sit next to OmniSave.ini
     final omniSavePath = await _extractOmniSave(game.folderPath);
     if (omniSavePath == null) {
-      print('[OmniSave] OmniSave.exe unavailable — falling back to direct launch');
+      print(
+          '[OmniSave] OmniSave.exe unavailable — falling back to direct launch');
       return null;
     }
 
@@ -111,7 +117,8 @@ class OmniSaveService {
   /// Waits for OmniSave to finish its work (sync saves, launch game, cleanup).
   /// OmniSave syncs saves to the drive, launches the game, then exits.
   /// We wait for the OmniSave process to exit to ensure saves are synced.
-  static Future<void> waitForSync(ProcessTracker tracker, {Duration timeout = const Duration(seconds: 30)}) async {
+  static Future<void> waitForSync(ProcessTracker tracker,
+      {Duration timeout = const Duration(seconds: 30)}) async {
     print('[OmniSave] Waiting for OmniSave to finish...');
     try {
       await tracker.whenExited.timeout(timeout);
@@ -122,10 +129,15 @@ class OmniSaveService {
   }
 
   Future<void> cleanupAfterLaunch(Game game) async {
-    // Remove OmniSave.exe and OmniSave.ini from the game folder after use
+    // Remove OmniSave.exe and OmniSave.ini from the game folder after use.
+    // Never throws — cleanup must not block the "back to PLAY" state reset.
     for (final name in ['OmniSave.exe', 'OmniSave.ini']) {
-      final f = File(p.join(game.folderPath, name));
-      if (await f.exists()) await f.delete();
+      try {
+        final f = File(p.join(game.folderPath, name));
+        if (await f.exists()) await f.delete();
+      } catch (e) {
+        print('[OmniSave] Cleanup failed for $name: $e');
+      }
     }
   }
 }

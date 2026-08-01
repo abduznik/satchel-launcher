@@ -136,6 +136,7 @@ class GameMetadata {
   final String? steamGridDbId;
   final String? igdbId;
   final String? screenScraperId;
+  final bool autoScanned;
 
   GameMetadata({
     this.summary,
@@ -150,6 +151,7 @@ class GameMetadata {
     this.steamGridDbId,
     this.igdbId,
     this.screenScraperId,
+    this.autoScanned = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -165,6 +167,7 @@ class GameMetadata {
     'steamGridDbId': steamGridDbId,
     'igdbId': igdbId,
     'screenScraperId': screenScraperId,
+    'autoScanned': autoScanned,
   };
 
   factory GameMetadata.fromJson(Map<String, dynamic> json) => GameMetadata(
@@ -182,6 +185,7 @@ class GameMetadata {
     steamGridDbId: json['steamGridDbId'],
     igdbId: json['igdbId'],
     screenScraperId: json['screenScraperId'],
+    autoScanned: json['autoScanned'] ?? false,
   );
 
   GameMetadata copyWith({
@@ -197,6 +201,7 @@ class GameMetadata {
     String? steamGridDbId,
     String? igdbId,
     String? screenScraperId,
+    bool? autoScanned,
   }) {
     return GameMetadata(
       summary: summary ?? this.summary,
@@ -211,6 +216,7 @@ class GameMetadata {
       steamGridDbId: steamGridDbId ?? this.steamGridDbId,
       igdbId: igdbId ?? this.igdbId,
       screenScraperId: screenScraperId ?? this.screenScraperId,
+      autoScanned: autoScanned ?? this.autoScanned,
     );
   }
 }
