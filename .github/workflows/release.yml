@@ -30,6 +30,9 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Setup Windows platform
+        run: flutter create --platforms=windows .
+
       - name: Flutter analyze
         run: flutter analyze
 
