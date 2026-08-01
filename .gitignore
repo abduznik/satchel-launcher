@@ -5,22 +5,36 @@
 *.iml
 .idea/
 .dart_tool/
+.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
+.flutter-plugins
+.metadata
 flutter_*.log
+
+# Generated / tool configs
+.claude/
+
+# Personal / project tracking
+PROJECT_STATUS.md
 
 # Games folders (user content, never commit)
 Games/
-H:/Games/
-H:\Games\
 
 # OmniSave runtime copies
 *.OmniSave.exe
 OmniSave.ini
 
+# Third-party binaries (download, don't commit)
+thirdparty/*.exe
+
 # Encrypted keys (user secrets)
 keys.enc
+
+# Environment / secrets
+.env
+.env.*
 
 # Platform-specific
 /android/

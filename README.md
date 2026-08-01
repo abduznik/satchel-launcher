@@ -8,31 +8,17 @@ Project Indie is a game library manager that runs entirely from a portable drive
 
 Plug in your drive, and Indie auto-starts with a splash screen, scans for games, fetches metadata and cover art from online databases, and lets you launch directly into your library.
 
-## Current Status
-
-**Phase 1 — Windows Native**
-- Windows native games (`.exe`)
-- Portable by design — everything lives on the drive
-- OmniSave integration for automatic save file sync across machines
-- PCGamingWiki integration for automatic save location detection
-- 6 theme presets with Material 3 design
-- Full controller and keyboard navigation support
-
-**Future Plans**
-- Proton/Wine auto-detection for Linux games (OmniSave already supports this via CrossOver/Proton)
-- Steam/Proton prefix management
-- Cloud save sync via OmniSave
-
 ## Features
 
 ### Game Library
-1. Drop game folders into `Games/` — each folder should contain the game's `.exe`
-2. Project Indie scans `Games/` on startup
-3. For each game, it fetches metadata (title, genre, release date) and cover art from:
-   - **SteamGridDB** — high-quality grid art and covers
-   - **IGDB** — game info, genres, release dates
-   - **ScreenScraper** — box art and screenshots
-4. All metadata and art is cached locally in each game's `.indie/` folder for offline use
+- Drop game folders into `Games/` — each folder should contain the game's `.exe`
+- Auto-detects the main executable via token-scoring against the folder name
+- Fetches metadata (title, genre, release date, rating, developer) and cover art from:
+  - **IGDB** — game info, genres, release dates, screenshots, trailers
+  - **SteamGridDB** — high-quality grid art and covers
+  - **ScreenScraper** — box art and screenshots
+- All metadata and art is cached locally in each game's `.indie/` folder for offline use
+- Grid view with hover effects and list+detail view with full banners
 
 ### Save Synchronization (OmniSave)
 Every game automatically uses [OmniSave](https://github.com/abduznik/OmniSave) for save file management:
@@ -61,9 +47,9 @@ On Windows, an `AutoRun.inf` file triggers Project Indie to launch when the driv
 - **OLED Black** — Pure black for OLED displays
 
 ### Controller Support
-- Full gamepad navigation with D-pad support
-- Button hints bar (A=Select, B=Back, Y=Details, X=Favorite)
-- Automatic input mode detection (mouse/keyboard/gamepad)
+- Full SDL2 gamepad stack with known controller mappings
+- D-pad navigation, deadzone configuration, axis state machine
+- Button hints bar and automatic input mode detection
 - Focus effects with visual feedback
 
 ### Setup Wizard
@@ -76,20 +62,19 @@ First-run wizard that guides you through:
 ## Drive Structure
 
 ```
-H:\ (Indie Lib)
-├── OmniSave.exe              # Save sync tool
+DriveRoot/
 ├── AutoRun.inf               # Windows auto-start
-├── ProjectIndie\             # This app
+├── ProjectIndie/             # This app
 │   ├── indie_launcher.exe
-│   └── thirdparty\
+│   └── thirdparty/
 │       └── OmniSave.exe      # Bundled copy
-├── Games\                    # Drop game folders here
-│   ├── GameName\
+├── Games/                    # Drop game folders here
+│   ├── GameName/
 │   │   ├── game.exe
-│   │   └── .indie\           # Cached metadata, art & OmniSave
+│   │   └── .indie/           # Cached metadata, art & OmniSave
 │   └── ...
-├── Saves\                    # OmniSave backup saves
-└── Config\                   # App settings & encrypted API keys
+├── Saves/                    # OmniSave backup saves
+└── Config/                   # App settings & encrypted API keys
 ```
 
 ## API Keys (Optional)
