@@ -1,5 +1,5 @@
 name: project_indie
-description: A portable offline-first DRM-free game launcher.
+description: A portable, offline-first DRM-free game launcher that lives on a USB drive. Browse, search, and launch your Windows games from any PC — no installation, no cloud account.
 publish_to: 'none'
 version: 1.0.0+1
 

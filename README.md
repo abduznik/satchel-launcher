@@ -1,104 +1,143 @@
 # Project Indie
 
-A portable, offline-first DRM-free game launcher designed to live on a USB drive. Drop your Windows games into the `Games/` folder, and Project Indie handles the rest — metadata, cover art, save synchronization, and launching.
+A portable, offline-first DRM-free game launcher that lives entirely on a USB drive. Drop your Windows games into a folder, plug the drive into any PC, and your library is ready — no installation, no cloud account, no launcher bloat.
 
 ## What Is This?
 
-Project Indie is a game library manager that runs entirely from a portable drive. It's built for people who carry their games on a USB stick and want a clean, unified way to browse and launch them on any Windows PC — no installation, no DRM, no launcher bloat.
+Project Indie is a game library manager built for people who carry their games on a USB stick. It runs entirely from the drive — all metadata, cover art, settings, and save files live next to your games. Plug in the drive on any Windows PC (or macOS via Crossover, or Linux via Proton), and your library is there with full metadata, artwork, and save synchronization.
 
-Plug in your drive, and Indie auto-starts with a splash screen, scans for games, fetches metadata and cover art from online databases, and lets you launch directly into your library.
+## How It Works
+
+### The Drive
+
+```
+YourDrive/
+├── ProjectIndie/          # The launcher (this app)
+│   ├── project_indie.exe
+│   └── thirdparty/
+├── Config/                # Settings, API keys, game database
+├── Games/                 # Drop your game folders here
+│   ├── GameName/
+│   │   ├── game.exe
+│   │   └── .indie/        # Cached metadata & art (auto-created)
+│   └── ...
+├── Saves/                 # OmniSave backup saves
+└── AutoRun.inf            # Auto-launches on Windows mount
+```
+
+### First Launch
+
+1. Plug in your drive — Project Indie auto-starts (Windows)
+2. Setup wizard guides you through configuring paths and optional API keys
+3. The launcher scans your `Games/` folder and detects executables automatically
+4. Cover art, metadata, genres, ratings, and screenshots are fetched in the background
+5. Everything is cached locally — after first setup, no internet needed
+
+### Game Launching
+
+Click **PLAY** on any game. Project Indie handles:
+
+- **Save synchronization** — saves are synced from the drive to your local system before launch, and back after you close the game. Your saves follow you between machines.
+- **Process tracking** — the launcher knows when your game is running and shows "NOW PLAYING" across your library. Click **STOP** to gracefully close the game.
+- **Double-launch protection** — trying to launch a second game shows a dialog asking to stop the current one first.
+
+### Portable Paths
+
+All paths are stored as `~/` notation (like OmniSave), relative to the drive root. This means:
+
+- **Change drive letter** (H: → J:) — still works
+- **Plug into macOS** — Crossover/Wine resolves the paths automatically
+- **Linux via Proton** — same portable path system
+
+The launcher finds the drive root by looking for the `Config/` folder, so it works regardless of where on the drive it's installed.
 
 ## Features
 
-### Game Library
-- Drop game folders into `Games/` — each folder should contain the game's `.exe`
-- Auto-detects the main executable via token-scoring against the folder name
-- Fetches metadata (title, genre, release date, rating, developer) and cover art from:
-  - **IGDB** — game info, genres, release dates, screenshots, trailers
-  - **SteamGridDB** — high-quality grid art and covers
-  - **ScreenScraper** — box art and screenshots
-- All metadata and art is cached locally in each game's `.indie/` folder for offline use
-- Grid view with hover effects and list+detail view with full banners
+### Metadata & Art
+
+- **IGDB integration** — full game info: summary, genres, developer, publisher, rating, release date, screenshots, and YouTube trailers
+- **SteamGridDB integration** — high-quality grid art and cover images
+- **ScreenScraper integration** — box art and screenshots (alternative source)
+- **Art picker dialog** — search across all databases, pick the best result, downloads cover + banner + screenshots
+- **Auto-fetch on startup** — background task fetches metadata for any game missing art
+- **Manual metadata editor** — edit all fields (name, summary, genres, developer, publisher, rating) for games not found in databases
+- **100% offline after first fetch** — all metadata, art, and screenshots cached in each game's `.indie/` folder
 
 ### Save Synchronization (OmniSave)
-Every game automatically uses [OmniSave](https://github.com/abduznik/OmniSave) for save file management:
-- Before launching, saves are synced from the portable drive to the local system path
+
+Project Indie uses [OmniSave](https://github.com/abduznik/OmniSave) for automatic save file management:
+
+- Before launching a game, saves are synced from the portable drive to the local system
 - After closing the game, saves are synced back to the drive
-- This means your saves follow you between machines — no manual copying
-- OmniSave is bundled in `thirdparty/` and copied to each game's `.indie/` directory at launch
+- Your saves follow you between machines — no manual copying
+- PCGamingWiki integration automatically detects where games store their saves
+- Skip-sync option for games with portable saves (inside the game folder)
 
-### Save Location Detection (PCGamingWiki)
-Project Indie automatically detects where games store their saves:
-- Searches PCGamingWiki for save file information
-- Expands environment variables (`%APPDATA%`, `~/`, etc.)
-- Shows detected save locations in the game detail view
-- Falls back to default paths if detection fails
+### Search
 
-### Auto-Start
-On Windows, an `AutoRun.inf` file triggers Project Indie to launch when the drive is mounted. You can also launch it manually from the drive root.
-
-### Themes
-6 built-in theme presets:
-- **Default Dark** — Deep purple accents
-- **Light** — Clean light theme
-- **Crimson** — Red accents
-- **Rose Gold** — Pink accents
-- **Neon Cyan** — Cyan accents
-- **OLED Black** — Pure black for OLED displays
+- Instant indexed search across game names, genres, developers, publishers, and summaries
+- Results ranked by relevance (exact match > prefix > genre > developer)
+- Ignores metadata source — searches both folder names and IGDB metadata
 
 ### Controller Support
+
 - Full SDL2 gamepad stack with known controller mappings
 - D-pad navigation, deadzone configuration, axis state machine
-- Button hints bar and automatic input mode detection
-- Focus effects with visual feedback
+- Button hints bar and automatic input mode detection (mouse/keyboard/gamepad)
 
-### Setup Wizard
-First-run wizard that guides you through:
-1. Drive detection
-2. Games and saves path configuration
-3. API key setup (SteamGridDB, IGDB, ScreenScraper)
-4. AutoStart.inf generation
+### Themes
 
-## Drive Structure
+6 built-in presets: Default Dark, Light, Crimson, Rose Gold, Neon Cyan, OLED Black
 
-```
-DriveRoot/
-├── AutoRun.inf               # Windows auto-start
-├── ProjectIndie/             # This app
-│   ├── indie_launcher.exe
-│   └── thirdparty/
-│       └── OmniSave.exe      # Bundled copy
-├── Games/                    # Drop game folders here
-│   ├── GameName/
-│   │   ├── game.exe
-│   │   └── .indie/           # Cached metadata, art & OmniSave
-│   └── ...
-├── Saves/                    # OmniSave backup saves
-└── Config/                   # App settings & encrypted API keys
-```
+## What Uses the Network?
+
+Project Indie is designed to work offline. The network is only used for:
+
+| Feature | When | What it does |
+|---------|------|--------------|
+| **Metadata fetch** | First time a game is scanned | Downloads game info from IGDB (genres, summary, rating, developer) |
+| **Art download** | First time a game is scanned | Downloads cover art, banners, and screenshots from IGDB/SteamGridDB |
+| **PCGamingWiki lookup** | When configuring save location | Looks up where a game stores its saves |
+| **Trailer links** | On click (opens in browser) | YouTube video URLs are stored, not downloaded |
+| **API key validation** | When adding/changing API keys | Verifies the key works with a test request |
+
+**After first setup: zero network required.** All metadata, art, and game data live on the drive.
+
+## Cross-Platform
+
+| Platform | Method | Status |
+|----------|--------|--------|
+| **Windows** | Native | Fully supported |
+| **macOS** | Crossover / Wine | Working — portable paths resolve automatically |
+| **Linux** | Proton / Wine | Should work — same Wine path resolution |
+
+The launcher is a Windows `.exe` (Flutter), but the portable `~/` path system means it works under Wine/Crossover/Proton without modification.
 
 ## API Keys (Optional)
 
-Project Indie can fetch richer metadata if you provide API keys:
-- **SteamGridDB** — Free, get a key at [steamgriddb.com/profile/preferences](https://www.steamgriddb.com/profile/preferences)
-- **IGDB** — Free via Twitch, requires Twitch developer account
-- **ScreenScraper** — Free tier available, paid tiers for higher rate limits
+API keys are optional — the launcher works without them, you just won't get automatic metadata.
 
-Without API keys, you can still use the launcher — you'll be prompted to manually enter game titles and can skip metadata fetching. All keys are stored encrypted on the drive.
+| Service | What it provides | How to get a key |
+|---------|-----------------|------------------|
+| **IGDB** | Game info, genres, ratings, screenshots, trailers | Free via [Twitch Developer](https://dev.twitch.tv/console/apps) |
+| **SteamGridDB** | Cover art and grid images | Free at [steamgriddb.com](https://www.steamgriddb.com/profile/preferences) |
+| **ScreenScraper** | Box art and screenshots | Free tier at [screenscraper.fr](https://www.screenscraper.fr/) |
+
+All keys are stored encrypted on the drive (`Config/keys.enc`) — never uploaded, never shared.
 
 ## Tech Stack
 
 - **Flutter** — Cross-platform UI framework
 - **Dart** — Application language
 - **Riverpod** — State management
-- **Hive** — Local storage
+- **Hive** — Local storage (game database, settings)
 - **Dio** — HTTP client for API calls
 - **Material 3** — Design system with theme presets
+- **OmniSave** — Save file synchronization
 
 ## Building
 
 ```bash
-# Ensure Flutter is installed
 flutter pub get
 flutter build windows
 ```
