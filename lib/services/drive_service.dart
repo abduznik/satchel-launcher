@@ -11,8 +11,8 @@ import 'package:hive/hive.dart';
 ///   +-- Config/          (signature folder, created on setup)
 ///   +-- Games/
 ///   +-- Saves/
-///   +-- ProjectIndie/    (appDir, where exe lives)
-///       +-- project_indie.exe
+///   +-- Satchel/         (appDir, where exe lives)
+///       +-- satchel.exe
 ///       +-- thirdparty/
 ///
 /// ~/Games/Foo  resolves to  H:/Games/Foo
@@ -30,8 +30,8 @@ class DriveService {
   }
 
   /// Finds the drive root by walking up from appDir looking for Config/.
-  /// This is flexible — works whether the app is at H:/ProjectIndie/
-  /// or H:/apps/myapps/ProjectIndie/ or anywhere else on the drive.
+  /// This is flexible — works whether the app is at H:/Satchel/
+  /// or H:/apps/myapps/Satchel/ or anywhere else on the drive.
   static String get driveRoot {
     if (_cachedDriveRoot != null) return _cachedDriveRoot!;
     _cachedDriveRoot = _findDriveRoot();

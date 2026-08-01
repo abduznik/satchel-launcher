@@ -1,23 +1,28 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game.dart';
+import '../services/process_tracker.dart';
 
 /// Tracks the currently running game.
 class PlayingGame {
   final Game game;
   final int pid;
-  final String processName; // e.g. "game.exe" or "OmniSave.exe"
+  final String processName;
   final DateTime startedAt;
+  final ProcessTracker tracker;
 
   PlayingGame({
     required this.game,
     required this.pid,
     required this.processName,
+    required this.tracker,
     DateTime? startedAt,
   }) : startedAt = startedAt ?? DateTime.now();
 }
 
 /// Global state for the currently playing game.
+/// The tracker lives here so it survives screen navigation.
 final playingGameProvider = StateProvider<PlayingGame?>((ref) => null);
 
 bool isAnyGamePlaying(WidgetRef ref) {
@@ -33,11 +38,12 @@ Future<void> stopCurrentGame(WidgetRef ref) async {
   final name = playing.processName;
   print('[PlayingGame] Stopping: ${playing.game.name} (PID: $pid, name: $name)');
 
+  // Cancel the tracker first so it doesn't re-detect
+  playing.tracker.dispose();
+
   try {
     if (Platform.isWindows) {
-      // Kill by PID
       await Process.run('taskkill', ['/F', '/T', '/PID', '$pid']);
-      // Also kill by name in case PID changed
       await Process.run('taskkill', ['/F', '/IM', name]);
     } else {
       await Process.run('kill', ['-TERM', '$pid']);
@@ -45,7 +51,6 @@ Future<void> stopCurrentGame(WidgetRef ref) async {
       try {
         await Process.run('kill', ['-9', '$pid']);
       } catch (_) {}
-      // Also kill by name
       try {
         await Process.run('pkill', ['-f', name]);
       } catch (_) {}

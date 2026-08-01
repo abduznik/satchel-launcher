@@ -310,7 +310,7 @@ class _Sidebar extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'INDIE',
+            'SATCHEL',
             style: TextStyle(
               color: cs.primary,
               fontSize: 9,
@@ -767,7 +767,6 @@ class _GameDetailPanel extends ConsumerStatefulWidget {
 class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
   bool _isLaunching = false;
   String _launchStatus = '';
-  GameLaunchService? _launchService;
 
   Future<void> _launchGame(Game game) async {
     if (_isLaunching) return;
@@ -825,8 +824,8 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
     }
 
     // Use the launch service for full lifecycle management
-    _launchService = GameLaunchService();
-    await _launchService!.launch(
+    final launchService = GameLaunchService();
+    await launchService.launch(
       game,
       ref,
       onStatusChanged: (status, message) {

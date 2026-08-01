@@ -36,7 +36,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
   final PcgamingwikiService _pcgamingwiki = PcgamingwikiService();
   bool _isLaunching = false;
   String _launchStatus = '';
-  GameLaunchService? _launchService;
 
   @override
   void initState() {
@@ -766,8 +765,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
     if (!mounted) return;
 
     // Use the launch service for full lifecycle management
-    _launchService = GameLaunchService();
-    await _launchService!.launch(
+    final launchService = GameLaunchService();
+    await launchService.launch(
       widget.game,
       ref,
       onStatusChanged: (status, message) {

@@ -24,10 +24,7 @@ enum LaunchStatus {
 
 /// Centralized game launch orchestrator.
 class GameLaunchService {
-  ProcessTracker? _tracker;
-
   /// Finds the actual game.exe process after OmniSave launches it.
-  /// OmniSave starts game.exe then may exit — we need to track game.exe, not OmniSave.
   Future<int?> _findGameProcess(String exeName) async {
     try {
       final result = await Process.run('tasklist', [
@@ -94,7 +91,6 @@ class GameLaunchService {
       // Step 2: Launch the game
       updateStatus(LaunchStatus.launching, 'Starting ${game.name}...');
 
-      // Read existing Local_Path from ini
       final iniFile = File(p.join(game.folderPath, '.indie', 'omnisave.ini'));
       String? existingLocalPath;
       if (await iniFile.exists()) {
@@ -118,29 +114,15 @@ class GameLaunchService {
       );
 
       if (omniSaveProcess != null) {
-        // OmniSave launched. Now find the actual game.exe process.
-        // OmniSave starts game.exe then exits — we need to track game.exe.
         final gameExeName = p.basename(game.exePath);
-
-        // Wait a moment for game.exe to start
         await Future.delayed(const Duration(seconds: 2));
-
-        // Search for the game process by name
         final gamePid = await _findGameProcess(gameExeName);
 
         if (gamePid != null) {
-          // Found game.exe — track it
           updateStatus(LaunchStatus.running, 'Running');
-          ref.read(playingGameProvider.notifier).state = PlayingGame(
-            game: game,
-            pid: gamePid,
-            processName: gameExeName,
-          );
-          ref.read(gameLibraryProvider.notifier).updateGame(
-            game.copyWith(lastPlayed: DateTime.now()),
-          );
 
-          _tracker = ProcessTracker(
+          // Create tracker and store it IN the provider so it survives navigation
+          final tracker = ProcessTracker(
             onExit: () async {
               print('[GameLaunch] Game exited');
               updateStatus(LaunchStatus.syncing, 'Syncing saves...');
@@ -149,23 +131,22 @@ class GameLaunchService {
               ref.read(playingGameProvider.notifier).state = null;
             },
           );
-          _tracker!.attachByName(gamePid, gameExeName);
-        } else {
-          // Couldn't find game.exe — OmniSave might still be running,
-          // or the game started with a different name.
-          // Track OmniSave as fallback.
-          print('[GameLaunch] game.exe not found, tracking OmniSave as fallback');
-          updateStatus(LaunchStatus.running, 'Running via OmniSave');
+          tracker.attachByName(gamePid, gameExeName);
+
           ref.read(playingGameProvider.notifier).state = PlayingGame(
             game: game,
-            pid: omniSaveProcess.pid,
-            processName: 'OmniSave.exe',
+            pid: gamePid,
+            processName: gameExeName,
+            tracker: tracker,
           );
           ref.read(gameLibraryProvider.notifier).updateGame(
             game.copyWith(lastPlayed: DateTime.now()),
           );
+        } else {
+          print('[GameLaunch] game.exe not found, tracking OmniSave as fallback');
+          updateStatus(LaunchStatus.running, 'Running via OmniSave');
 
-          _tracker = ProcessTracker(
+          final tracker = ProcessTracker(
             onExit: () async {
               print('[GameLaunch] OmniSave exited');
               updateStatus(LaunchStatus.syncing, 'Syncing saves...');
@@ -174,7 +155,17 @@ class GameLaunchService {
               ref.read(playingGameProvider.notifier).state = null;
             },
           );
-          _tracker!.attach(omniSaveProcess);
+          tracker.attach(omniSaveProcess);
+
+          ref.read(playingGameProvider.notifier).state = PlayingGame(
+            game: game,
+            pid: omniSaveProcess.pid,
+            processName: 'OmniSave.exe',
+            tracker: tracker,
+          );
+          ref.read(gameLibraryProvider.notifier).updateGame(
+            game.copyWith(lastPlayed: DateTime.now()),
+          );
         }
         return;
       }
@@ -189,32 +180,29 @@ class GameLaunchService {
 
       final gameExeName = p.basename(game.exePath);
       updateStatus(LaunchStatus.running, 'Running');
-      ref.read(playingGameProvider.notifier).state = PlayingGame(
-        game: game,
-        pid: gameProcess.pid,
-        processName: gameExeName,
-      );
-      ref.read(gameLibraryProvider.notifier).updateGame(
-        game.copyWith(lastPlayed: DateTime.now()),
-      );
 
-      _tracker = ProcessTracker(
+      final tracker = ProcessTracker(
         onExit: () {
           print('[GameLaunch] Game exited');
           updateStatus(LaunchStatus.done, '');
           ref.read(playingGameProvider.notifier).state = null;
         },
       );
-      _tracker!.attach(gameProcess);
+      tracker.attach(gameProcess);
+
+      ref.read(playingGameProvider.notifier).state = PlayingGame(
+        game: game,
+        pid: gameProcess.pid,
+        processName: gameExeName,
+        tracker: tracker,
+      );
+      ref.read(gameLibraryProvider.notifier).updateGame(
+        game.copyWith(lastPlayed: DateTime.now()),
+      );
     } catch (e) {
       print('[GameLaunch] Error: $e');
       updateStatus(LaunchStatus.error, 'Launch failed: $e');
       ref.read(playingGameProvider.notifier).state = null;
     }
-  }
-
-  void cancel() {
-    _tracker?.dispose();
-    _tracker = null;
   }
 }

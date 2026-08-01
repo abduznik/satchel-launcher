@@ -12,8 +12,8 @@ Satchel is a game library manager built for people who carry their games on a US
 
 ```
 YourDrive/
-├── ProjectIndie/          # The launcher (this app)
-│   ├── project_indie.exe
+├── Satchel/               # The launcher
+│   ├── satchel.exe
 │   └── thirdparty/
 ├── Config/                # Settings, API keys, game database
 ├── Games/                 # Drop your game folders here

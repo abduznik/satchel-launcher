@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import '../providers/api_provider.dart';
 import '../providers/game_library_provider.dart';
+import '../providers/playing_game_provider.dart';
 import '../services/drive_service.dart';
 import '../services/migration_service.dart';
 
@@ -56,18 +57,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _bootstrap() async {
-    // Minimum splash display so the animation has time to show
+    // Clean up any orphaned game processes from a previous session
+    _cleanupOrphanedProcesses();
+
     final settingsBox = Hive.box('settings');
     final setupDone = settingsBox.get('setupDone', defaultValue: false);
     print('[SplashScreen] setupDone = $setupDone');
 
     if (!setupDone) {
-      // Check if there's existing data on the drive that could be migrated
       final migrationInfo = await MigrationService.scan();
       if (!mounted) return;
 
       if (migrationInfo.hasAnyData) {
-        // Found existing data — show migration dialog before setup
         final shouldMigrate = await _showMigrationDialog(migrationInfo);
         if (!mounted) return;
 
@@ -76,11 +77,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           if (!mounted) return;
 
           if (result.success) {
-            // Reload API config (keys.enc may have been imported)
             ref.invalidate(apiConfigProvider);
-
             if (result.settingsImported) {
-              // Migration successful — go straight to library
               final hasCached = Hive.box('games').get('games', defaultValue: []) as List;
               if (hasCached.isNotEmpty) {
                 Navigator.of(context).pushReplacementNamed('/library');
@@ -92,30 +90,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         }
       }
 
-      // No data to migrate or user declined — go to setup
       await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/setup');
     } else {
-      // Navigate to library immediately showing cached games,
-      // then kick off a background rescan (non-blocking).
-      // If no cache exists yet, wait for one quick scan first.
-      final hasCached = Hive.box('games').get('games', defaultValue: [])
-          as List;
+      final hasCached = Hive.box('games').get('games', defaultValue: []) as List;
 
       if (hasCached.isNotEmpty) {
-        // Show library immediately with cached data, rescan in background
         await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/library');
-        // Background rescan — does not block navigation
         ref.read(gameLibraryProvider.notifier).rescan();
       } else {
-        // First run after setup — do one scan before showing library
         await ref.read(gameLibraryProvider.notifier).rescan();
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/library');
       }
+    }
+  }
+
+  /// Clean up any game processes that might be orphaned from a previous session.
+  void _cleanupOrphanedProcesses() {
+    final playing = ref.read(playingGameProvider);
+    if (playing != null) {
+      print('[SplashScreen] Found orphaned game process, cleaning up');
+      ref.read(playingGameProvider.notifier).state = null;
     }
   }
 
@@ -130,10 +129,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                color: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.find_in_page_rounded, color: Color(0xFF7C3AED), size: 18),
+              child: Icon(Icons.find_in_page_rounded, color: Theme.of(ctx).colorScheme.primary, size: 18),
             ),
             const SizedBox(width: 12),
             const Expanded(child: Text('Existing Data Found')),
@@ -198,8 +197,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF0A0A10);
-    const accentColor = Color(0xFF7C3AED);
+    // Use theme colors instead of hardcoded purple
+    final cs = Theme.of(context).colorScheme;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final accentColor = cs.primary;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -207,7 +208,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         opacity: _fadeIn,
         child: Stack(
           children: [
-            // Subtle radial gradient background
+            // Subtle radial gradient background using theme accent
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -228,7 +229,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Animated gem / logo shape
+                  // Animated logo shape
                   AnimatedBuilder(
                     animation: _pulse,
                     builder: (context, child) {
@@ -250,10 +251,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       width: 96,
                       height: 96,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF9F67FF), Color(0xFF5B21B6)],
+                          colors: [
+                            accentColor.withValues(alpha: 1.0),
+                            accentColor.withValues(alpha: 0.6),
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
@@ -261,8 +265,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           width: 1,
                         ),
                       ),
-                      child: const Icon(
-                        Icons.diamond_rounded,
+                      child: Icon(
+                        Icons.shopping_bag_rounded,
                         size: 48,
                         color: Colors.white,
                       ),
@@ -271,20 +275,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
                   const SizedBox(height: 36),
 
-                  // Title with gradient text
+                  // Title with gradient text using theme accent
                   ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFFD8C4FF), Color(0xFF7C3AED)],
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [
+                        accentColor.withValues(alpha: 0.8),
+                        accentColor,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ).createShader(bounds),
                     child: const Text(
-                      'PROJECT INDIE',
+                      'SATCHEL',
                       style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
-                        letterSpacing: 8,
+                        letterSpacing: 10,
                       ),
                     ),
                   ),
@@ -296,14 +303,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: cs.onSurface.withValues(alpha: 0.35),
                       letterSpacing: 4,
                     ),
                   ),
 
                   const SizedBox(height: 64),
 
-                  // Thin animated progress bar
+                  // Animated progress bar using theme accent
                   SizedBox(
                     width: 220,
                     child: Column(
@@ -316,9 +323,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               child: LinearProgressIndicator(
                                 value: _barProgress.value,
                                 minHeight: 2,
-                                backgroundColor: Colors.white.withValues(alpha: 0.08),
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF9F67FF),
+                                backgroundColor: cs.onSurface.withValues(alpha: 0.08),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  accentColor,
                                 ),
                               ),
                             );
@@ -329,7 +336,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           'Loading...',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.25),
+                            color: cs.onSurface.withValues(alpha: 0.25),
                             letterSpacing: 1.5,
                           ),
                         ),
@@ -348,7 +355,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 'v1.0',
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: cs.onSurface.withValues(alpha: 0.15),
                   letterSpacing: 1,
                 ),
               ),
