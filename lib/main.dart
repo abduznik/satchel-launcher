@@ -8,6 +8,9 @@ import 'app/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Kill any orphaned OmniSave processes from previous sessions
+  _killOrphanedProcesses();
+
   // Store all Hive data in Config/ next to the exe — fully portable.
   final hiveDir = Directory(DriveService.configPath);
   if (!await hiveDir.exists()) await hiveDir.create(recursive: true);
@@ -24,4 +27,12 @@ void main() async {
       child: SatchelApp(),
     ),
   );
+}
+
+void _killOrphanedProcesses() {
+  try {
+    if (Platform.isWindows) {
+      Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
+    }
+  } catch (_) {}
 }

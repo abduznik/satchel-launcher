@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +10,6 @@ import '../screens/library_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/setup_wizard_screen.dart';
 
-
 class SatchelApp extends ConsumerStatefulWidget {
   const SatchelApp({super.key});
 
@@ -17,19 +17,41 @@ class SatchelApp extends ConsumerStatefulWidget {
   ConsumerState<SatchelApp> createState() => _SatchelAppState();
 }
 
-class _SatchelAppState extends ConsumerState<SatchelApp> {
+class _SatchelAppState extends ConsumerState<SatchelApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // Initialize the real Riverpod gamepad service (reads after first frame)
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(gamepadServiceProvider);
     });
+    // Kill orphaned processes from previous sessions
+    _killOrphanedProcesses();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// When the app is closing, kill any tracked game/OmniSave processes.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      print('[Satchel] App detaching — cleaning up processes');
+      _killOrphanedProcesses();
+    }
+  }
+
+  void _killOrphanedProcesses() {
+    try {
+      if (Platform.isWindows) {
+        // Kill any leftover OmniSave or game processes from this launcher
+        Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
+      }
+    } catch (_) {}
   }
 
   @override
