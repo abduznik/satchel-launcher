@@ -288,25 +288,27 @@ class _Sidebar extends ConsumerWidget {
         children: [
           const SizedBox(height: 16),
           // Logo icon
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [cs.primary, cs.primary.withValues(alpha: 0.6)],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.primary.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/icon.png',
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [cs.primary, cs.primary.withValues(alpha: 0.6)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+                child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 22),
+              ),
             ),
-            child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 22),
           ),
           const SizedBox(height: 4),
           Text(

@@ -8,7 +8,7 @@ import 'app/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Kill any orphaned OmniSave processes from previous sessions
+  // Kill orphaned processes from previous sessions (NOT the current one)
   _killOrphanedProcesses();
 
   // Store all Hive data in Config/ next to the exe — fully portable.
@@ -32,10 +32,10 @@ void main() async {
 void _killOrphanedProcesses() {
   try {
     if (Platform.isWindows) {
-      // Kill any leftover OmniSave or game processes from previous sessions
+      // Kill leftover OmniSave processes
       Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
-      // Kill orphaned satchel.exe processes (use taskkill /FI to filter)
-      Process.run('taskkill', ['/F', '/IM', 'satchel.exe']);
+      // Note: Do NOT kill satchel.exe here — it would kill THIS process!
+      // Orphaned satchel.exe cleanup happens via AppLifecycleState.detached in app.dart
     }
   } catch (_) {}
 }
