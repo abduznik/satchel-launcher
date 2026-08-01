@@ -9,24 +9,21 @@ import 'app/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Kill orphaned processes from previous sessions
+  // Step 1: Kill orphaned processes from previous sessions
   _killOrphanedProcesses();
 
-  // Wait for icudtl.dat to be unlocked (double-sided handshake)
-  // If the previous instance is still closing, it holds a lock on this file.
-  await _waitForFileUnlock();
+  // Step 2: Wait for all old satchel processes to fully die
+  await _waitForProcessCleanup();
 
-  // Ensure config directory exists
+  // Step 3: Init Hive and app
   final hiveDir = Directory(DriveService.configPath);
   if (!await hiveDir.exists()) await hiveDir.create(recursive: true);
 
-  // Init Hive
   Hive.init(hiveDir.path);
   await Hive.openBox('settings');
   await Hive.openBox('games');
   await DriveService.ensureDirectories();
 
-  // Write current PID for next startup cleanup
   _writePidFile();
 
   runApp(
@@ -36,70 +33,79 @@ void main() async {
   );
 }
 
-/// Waits for icudtl.dat to be unlocked by the previous instance.
-/// If the file is locked, the previous app is still running — we wait
-/// for it to release the file handle before starting.
-Future<void> _waitForFileUnlock() async {
-  if (!Platform.isWindows) return;
-
-  // Find icudtl.dat relative to the exe
-  final exeDir = p.dirname(Platform.resolvedExecutable);
-  final icuFile = File(p.join(exeDir, 'data', 'icudtl.dat'));
-
-  if (!await icuFile.exists()) return;
-
-  // Try to open the file exclusively — if it fails, it's locked
-  for (var i = 0; i < 50; i++) {
-    try {
-      // RandomAccessLock: opens file with exclusive access
-      final handle = await icuFile.open(mode: FileMode.read);
-      await handle.close();
-      // File is unlocked — we can proceed
-      if (i > 0) {
-        print('[Satchel] icudtl.dat unlocked after ${i * 100}ms');
-      }
-      return;
-    } catch (_) {
-      // File is locked — previous instance still running
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-  }
-
-  // Timeout after 5 seconds — proceed anyway
-  print('[Satchel] icudtl.dat still locked after 5s, proceeding anyway');
-}
-
-/// Kills all orphaned satchel.exe and OmniSave.exe processes.
+/// Kills orphaned processes.
 void _killOrphanedProcesses() {
   try {
     if (!Platform.isWindows) return;
-
-    // Kill all OmniSave processes
     Process.runSync('taskkill', ['/F', '/IM', 'OmniSave.exe']);
-
-    // Kill orphaned satchel.exe processes
-    final result = Process.runSync('taskkill', ['/IM', 'satchel.exe', '/F']);
-    final output = result.stdout.toString();
-    if (output.contains('SUCCESS')) {
-      print('[Satchel] Killed orphaned processes');
-      sleep(const Duration(milliseconds: 200));
-    }
+    Process.runSync('taskkill', ['/IM', 'satchel.exe', '/F']);
   } catch (_) {}
 }
 
-/// Writes current PID to a file for next startup cleanup.
-void _writePidFile() {
+/// Waits for all satchel.exe processes (except current) to fully die.
+/// Polls tasklist every 100ms, gives up after 5 seconds.
+Future<void> _waitForProcessCleanup() async {
+  if (!Platform.isWindows) return;
+
+  final currentPid = _getCurrentPid();
+
+  for (var i = 0; i < 50; i++) {
+    final pids = _getRunningPids('satchel.exe');
+    // Remove current process from the list
+    pids.removeWhere((pid) => pid == currentPid);
+
+    if (pids.isEmpty) return; // No other satchel processes — we're good
+
+    print('[Satchel] Waiting for orphaned PIDs to die: $pids');
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  print('[Satchel] Timeout waiting for cleanup, proceeding anyway');
+}
+
+/// Gets the current process PID.
+int _getCurrentPid() {
   try {
-    if (!Platform.isWindows) return;
     final result = Process.runSync('wmic', [
       'process', 'where', 'name="satchel.exe"', 'get', 'ProcessId', '/format:list'
     ]);
     final output = result.stdout.toString();
-    final match = RegExp(r'ProcessId=(\d+)').firstMatch(output);
-    if (match != null) {
-      final pid = match.group(1);
+    // wmic returns ALL satchel PIDs — the last one is usually the newest (current)
+    final pids = <int>[];
+    for (final match in RegExp(r'ProcessId=(\d+)').allMatches(output)) {
+      final pid = int.tryParse(match.group(1)!);
+      if (pid != null) pids.add(pid);
+    }
+    return pids.isNotEmpty ? pids.last : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+/// Gets all PIDs for a given process name.
+List<int> _getRunningPids(String processName) {
+  final pids = <int>[];
+  try {
+    final result = Process.runSync('tasklist', [
+      '/FI', 'IMAGENAME eq $processName', '/NH'
+    ]);
+    final output = result.stdout.toString();
+    for (final match in RegExp(r'(\d+)\s+\S+\s+\d+').allMatches(output)) {
+      final pid = int.tryParse(match.group(1)!);
+      if (pid != null) pids.add(pid);
+    }
+  } catch (_) {}
+  return pids;
+}
+
+/// Writes current PID for next startup.
+void _writePidFile() {
+  try {
+    if (!Platform.isWindows) return;
+    final pid = _getCurrentPid();
+    if (pid > 0) {
       final pidFile = File(p.join(DriveService.configPath, 'satchel.pid'));
-      pidFile.writeAsStringSync(pid!);
+      pidFile.writeAsStringSync('$pid');
       print('[Satchel] Wrote PID: $pid');
     }
   } catch (_) {}
