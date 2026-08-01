@@ -8,7 +8,7 @@ class AutostartService {
 [AutoRun]
 open=$relativePath
 icon=$relativePath,0
-action=Launch Project Indie
+action=Launch Satchel
 ''';
 
     final file = File(p.join(driveRoot, 'AutoRun.inf'));

@@ -1,10 +1,10 @@
-# Project Indie
+# Satchel
 
 A portable, offline-first DRM-free game launcher that lives entirely on a USB drive. Drop your Windows games into a folder, plug the drive into any PC, and your library is ready — no installation, no cloud account, no launcher bloat.
 
 ## What Is This?
 
-Project Indie is a game library manager built for people who carry their games on a USB stick. It runs entirely from the drive — all metadata, cover art, settings, and save files live next to your games. Plug in the drive on any Windows PC (or macOS via Crossover, or Linux via Proton), and your library is there with full metadata, artwork, and save synchronization.
+Satchel is a game library manager built for people who carry their games on a USB stick. It runs entirely from the drive — all metadata, cover art, settings, and save files live next to your games. Plug in the drive on any Windows PC (or macOS via Crossover, or Linux via Proton), and your library is there with full metadata, artwork, and save synchronization.
 
 ## How It Works
 
@@ -27,7 +27,7 @@ YourDrive/
 
 ### First Launch
 
-1. Plug in your drive — Project Indie auto-starts (Windows)
+1. Plug in your drive — Satchel auto-starts (Windows)
 2. Setup wizard guides you through configuring paths and optional API keys
 3. The launcher scans your `Games/` folder and detects executables automatically
 4. Cover art, metadata, genres, ratings, and screenshots are fetched in the background
@@ -35,7 +35,7 @@ YourDrive/
 
 ### Game Launching
 
-Click **PLAY** on any game. Project Indie handles:
+Click **PLAY** on any game. Satchel handles:
 
 - **Save synchronization** — saves are synced from the drive to your local system before launch, and back after you close the game. Your saves follow you between machines.
 - **Process tracking** — the launcher knows when your game is running and shows "NOW PLAYING" across your library. Click **STOP** to gracefully close the game.
@@ -65,7 +65,7 @@ The launcher finds the drive root by looking for the `Config/` folder, so it wor
 
 ### Save Synchronization (OmniSave)
 
-Project Indie uses [OmniSave](https://github.com/abduznik/OmniSave) for automatic save file management:
+Satchel uses [OmniSave](https://github.com/abduznik/OmniSave) for automatic save file management:
 
 - Before launching a game, saves are synced from the portable drive to the local system
 - After closing the game, saves are synced back to the drive
@@ -91,7 +91,7 @@ Project Indie uses [OmniSave](https://github.com/abduznik/OmniSave) for automati
 
 ## What Uses the Network?
 
-Project Indie is designed to work offline. The network is only used for:
+Satchel is designed to work offline. The network is only used for:
 
 | Feature | When | What it does |
 |---------|------|--------------|

@@ -75,7 +75,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
             children: [
               Container(width: 80, height: 80, decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(20)), child: Icon(Icons.gamepad_rounded, size: 40, color: theme.colorScheme.primary)),
               const SizedBox(height: 24),
-              Text('Project Indie Setup', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+              Text('Satchel Setup', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
               Text(_getStepSubtitle(), style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 14)),
               const SizedBox(height: 48),
@@ -187,7 +187,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
         const SizedBox(height: 24),
         FocusEffectWrapper(
           onTap: () async {
-            final exePath = p.join(DriveService.appDir, 'project_indie.exe');
+            final exePath = p.join(DriveService.appDir, 'satchel.exe');
             await _autostartService.generateAutoRunInf(DriveService.appDir, exePath);
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AutoRun.inf created!'), backgroundColor: Colors.green));
           },
@@ -256,7 +256,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
     await settingsBox.put('setupDone', true);
     print('[SetupWizard] setupDone = true');
 
-    final exePath = p.join(DriveService.appDir, 'project_indie.exe');
+    final exePath = p.join(DriveService.appDir, 'satchel.exe');
     await _autostartService.generateAutoRunInf(DriveService.appDir, exePath);
 
     await ref.read(gameLibraryProvider.notifier).rescan();

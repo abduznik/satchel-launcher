@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 
 class PcgamingwikiService {
   static const _apiBase = 'https://www.pcgamingwiki.com/w/api.php';
-  static const _userAgent = 'ProjectIndie/1.0 (portable-game-launcher) Dio/5.0';
+  static const _userAgent = 'Satchel/1.0 (portable-game-launcher) Dio/5.0';
   final Dio _dio;
 
   PcgamingwikiService({Dio? dio})

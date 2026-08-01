@@ -22,7 +22,7 @@ class EncryptionService {
     final username = Platform.environment['USERNAME'] ??
         Platform.environment['USER'] ??
         'default';
-    final raw = '$hostname:$username:project_indie_salt';
+    final raw = '$hostname:$username:satchel_salt';
     final bytes = utf8.encode(raw);
     final digest = sha256.convert(bytes);
     return digest.toString().substring(0, 32);

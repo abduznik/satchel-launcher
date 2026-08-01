@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/models/game.dart';
+import 'package:satchel/models/game.dart';
 
 void main() {
   group('Game', () {

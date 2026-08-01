@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/models/api_config.dart';
+import 'package:satchel/models/api_config.dart';
 
 void main() {
   group('ApiConfig', () {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/services/game_scanner.dart';
+import 'package:satchel/services/game_scanner.dart';
 
 void main() {
   group('GameScanner._tokenize', () {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/models/api_search_result.dart';
+import 'package:satchel/models/api_search_result.dart';
 
 void main() {
   test('ApiSearchResult creation', () {

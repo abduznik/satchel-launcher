@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/models/game.dart';
+import 'package:satchel/models/game.dart';
 
 /// Replicates the matching logic from search_provider.dart for unit testing.
 /// Note: the provider lowercases the query before calling this, so queries

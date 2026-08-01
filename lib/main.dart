@@ -21,7 +21,7 @@ void main() async {
 
   runApp(
     const ProviderScope(
-      child: ProjectIndieApp(),
+      child: SatchelApp(),
     ),
   );
 }

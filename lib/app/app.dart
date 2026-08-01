@@ -10,14 +10,14 @@ import '../screens/settings_screen.dart';
 import '../screens/setup_wizard_screen.dart';
 
 
-class ProjectIndieApp extends ConsumerStatefulWidget {
-  const ProjectIndieApp({super.key});
+class SatchelApp extends ConsumerStatefulWidget {
+  const SatchelApp({super.key});
 
   @override
-  ConsumerState<ProjectIndieApp> createState() => _ProjectIndieAppState();
+  ConsumerState<SatchelApp> createState() => _SatchelAppState();
 }
 
-class _ProjectIndieAppState extends ConsumerState<ProjectIndieApp> {
+class _SatchelAppState extends ConsumerState<SatchelApp> {
   @override
   void initState() {
     super.initState();
@@ -47,7 +47,7 @@ class _ProjectIndieAppState extends ConsumerState<ProjectIndieApp> {
           }
         },
         child: MaterialApp(
-          title: 'Project Indie',
+          title: 'Satchel',
           debugShowCheckedModeBanner: false,
           theme: theme.theme,
           initialRoute: '/',

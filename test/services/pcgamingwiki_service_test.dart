@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_indie/services/pcgamingwiki_service.dart';
+import 'package:satchel/services/pcgamingwiki_service.dart';
 
 void main() {
   group('PcgamingwikiService._buildSearchCandidates', () {

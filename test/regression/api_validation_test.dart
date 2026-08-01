@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dio/dio.dart';
-import 'package:project_indie/services/steamgriddb_api.dart';
-import 'package:project_indie/services/igdb_api.dart';
-import 'package:project_indie/services/screenscraper_api.dart';
+import 'package:satchel/services/steamgriddb_api.dart';
+import 'package:satchel/services/igdb_api.dart';
+import 'package:satchel/services/screenscraper_api.dart';
 
 class MockDio extends Mock implements Dio {}
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 
 enum AppTheme {
+  amber,        // NEW default — warm yellow/gold
   defaultDark,
   light,
   crimson,
@@ -19,7 +20,7 @@ class ThemePreset {
 }
 
 class ThemeProvider extends ChangeNotifier {
-  AppTheme _currentTheme = AppTheme.defaultDark;
+  AppTheme _currentTheme = AppTheme.amber;
   late Box _settingsBox;
 
   ThemeProvider() {
@@ -33,6 +34,7 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemePreset _getThemePreset(AppTheme theme) {
     switch (theme) {
+      case AppTheme.amber:       return _amberTheme();
       case AppTheme.defaultDark: return _defaultDarkTheme();
       case AppTheme.light:       return _lightTheme();
       case AppTheme.crimson:     return _crimsonTheme();
@@ -42,9 +44,36 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  // ── Amber / Gold (default) ─────────────────────────────────────────────
+  ThemePreset _amberTheme() {
+    return ThemePreset(
+      name: 'Amber',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFF59E0B),
+          secondary: Color(0xFFFBBF24),
+          surface: Color(0xFF1A1814),
+          onSurface: Color(0xFFF5F0E8),
+          outline: Color(0xFF3D3520),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF12100C),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF1A1814),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14))),
+          elevation: 0,
+        ),
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF1A1814), elevation: 0),
+        dividerTheme: const DividerThemeData(color: Color(0xFF3D3520), thickness: 1),
+      ),
+    );
+  }
+
+  // ── Default Dark (purple) ──────────────────────────────────────────────
   ThemePreset _defaultDarkTheme() {
     return ThemePreset(
-      name: 'Default Dark',
+      name: 'Dark',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
@@ -74,8 +103,8 @@ class ThemeProvider extends ChangeNotifier {
         brightness: Brightness.light,
         useMaterial3: true,
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF7C3AED),
-          secondary: Color(0xFF9F67FF),
+          primary: Color(0xFFF59E0B),
+          secondary: Color(0xFFFBBF24),
           surface: Color(0xFFFFFFFF),
           onSurface: Color(0xFF1A1A2E),
           outline: Color(0xFFE0E0F0),
@@ -189,7 +218,11 @@ class ThemeProvider extends ChangeNotifier {
 
   void _loadTheme() {
     final themeIndex = _settingsBox.get('theme', defaultValue: 0);
-    _currentTheme = AppTheme.values[themeIndex];
+    if (themeIndex < AppTheme.values.length) {
+      _currentTheme = AppTheme.values[themeIndex];
+    } else {
+      _currentTheme = AppTheme.amber;
+    }
   }
 
   Future<void> setTheme(AppTheme theme) async {

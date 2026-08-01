@@ -592,6 +592,7 @@ class _ThemeGrid extends ConsumerWidget {
   const _ThemeGrid(this.themeP);
 
   static const _themeData = <AppTheme, (String, Color)>{
+    AppTheme.amber:       ('Amber', Color(0xFFF59E0B)),
     AppTheme.defaultDark: ('Dark', Color(0xFF7C3AED)),
     AppTheme.light:       ('Light', Color(0xFF94A3B8)),
     AppTheme.crimson:     ('Crimson', Color(0xFFDC2626)),
