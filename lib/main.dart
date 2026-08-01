@@ -9,18 +9,17 @@ import 'app/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Kill orphaned processes from previous sessions using PID file
-  _killOrphanedProcesses();
-
-  // Store all Hive data in Config/ next to the exe — fully portable.
+  // Ensure config directory exists FIRST so PID file can be read/written
   final hiveDir = Directory(DriveService.configPath);
   if (!await hiveDir.exists()) await hiveDir.create(recursive: true);
-  Hive.init(hiveDir.path);
 
+  // Kill orphaned processes from previous sessions
+  _killOrphanedProcesses();
+
+  // Init Hive
+  Hive.init(hiveDir.path);
   await Hive.openBox('settings');
   await Hive.openBox('games');
-
-  // Ensure drive directories exist
   await DriveService.ensureDirectories();
 
   // Write current PID so next startup can kill us if we ghost
@@ -46,7 +45,6 @@ void _killOrphanedProcesses() {
     if (pidFile.existsSync()) {
       final oldPid = int.tryParse(pidFile.readAsStringSync().trim());
       if (oldPid != null) {
-        // Check if that PID is still running
         final result = Process.runSync('tasklist', ['/FI', 'PID eq $oldPid', '/NH']);
         final output = result.stdout.toString();
         if (output.contains('$oldPid') && !output.contains('INFO:')) {
@@ -56,9 +54,6 @@ void _killOrphanedProcesses() {
       }
       pidFile.deleteSync();
     }
-
-    // Also kill any other orphaned OmniSave processes
-    Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
   } catch (_) {}
 }
 
@@ -66,12 +61,16 @@ void _killOrphanedProcesses() {
 void _writePidFile() {
   try {
     if (!Platform.isWindows) return;
-    // Get current PID via PowerShell since Dart doesn't expose it directly
-    final result = Process.runSync('powershell', ['-Command', '[System.Diagnostics.Process]::GetCurrentProcess().Id']);
-    final pid = int.tryParse(result.stdout.toString().trim());
-    if (pid != null) {
+    // Get current PID using wmic (faster and more reliable than PowerShell)
+    final result = Process.runSync('wmic', ['process', 'where', 'name="satchel.exe"', 'get', 'ProcessId', '/format:list']);
+    final output = result.stdout.toString();
+    // Parse "ProcessId=12345"
+    final match = RegExp(r'ProcessId=(\d+)').firstMatch(output);
+    if (match != null) {
+      final pid = match.group(1);
       final pidFile = File(p.join(DriveService.configPath, 'satchel.pid'));
-      pidFile.writeAsStringSync('$pid');
+      pidFile.writeAsStringSync(pid!);
+      print('[Satchel] Wrote PID file: $pid');
     }
   } catch (_) {}
 }

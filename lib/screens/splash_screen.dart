@@ -268,7 +268,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             ),
                             borderRadius: BorderRadius.circular(28),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.shopping_bag_rounded,
                             size: 48,
                             color: Colors.white,
