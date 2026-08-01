@@ -118,6 +118,7 @@ class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderSt
                 // ── Background: cover image ──────────
                 hasCover
                     ? Container(
+                        key: ValueKey('cover_${game.id}_${game.lastPlayed.millisecondsSinceEpoch}'),
                         decoration: BoxDecoration(
                           image: DecorationImage(
                             image: FileImage(File(game.coverPath!)),

@@ -82,7 +82,7 @@ class _ArtPickerDialogState extends ConsumerState<ArtPickerDialog> {
     final svc = ref.read(metadataFetchServiceProvider);
     print('[ArtPicker] fetchFull for ${widget.game.name} / selected=${_selected!.id}');
     final data = await svc.fetchFull(widget.game, _selected!);
-    print('[ArtPicker] cover=${data.coverPath} banner=${data.bannerPath} meta=${data.metadata?.summary?.substring(0, (data.metadata!.summary!.length).clamp(0, 40))}');
+    print('[ArtPicker] cover=${data.coverPath} banner=${data.bannerPath} meta=${data.metadata != null ? "ok" : "null"}');
 
     if (!mounted) return;
 

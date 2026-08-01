@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,31 +25,12 @@ class _SatchelAppState extends ConsumerState<SatchelApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(gamepadServiceProvider);
     });
-    // Kill orphaned processes from previous sessions
-    _killOrphanedProcesses();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  /// When the app is closing, kill any tracked game/OmniSave processes.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached) {
-      print('[Satchel] App detaching — cleaning up processes');
-      _killOrphanedProcesses();
-    }
-  }
-
-  void _killOrphanedProcesses() {
-    try {
-      if (Platform.isWindows) {
-        Process.run('taskkill', ['/F', '/IM', 'OmniSave.exe']);
-      }
-    } catch (_) {}
   }
 
   @override

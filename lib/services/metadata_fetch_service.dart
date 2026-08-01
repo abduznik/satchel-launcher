@@ -20,6 +20,7 @@ class MetadataFetchService {
   Future<List<ApiSearchResult>> searchCandidates(String query) async {
     final results = <ApiSearchResult>[];
 
+    // Try IGDB first (has full metadata)
     if (igdb != null && igdb!.isAuthenticated) {
       try {
         final igdbResults = await igdb!.search(query);
@@ -29,7 +30,16 @@ class MetadataFetchService {
       }
     }
 
-    // Dedupe by name (IGDB is primary source; SteamGridDB has no metadata)
+    // If no IGDB results, try SteamGridDB (cover art only)
+    if (results.isEmpty && steamGridDb != null) {
+      try {
+        final sgResults = await steamGridDb!.search(query);
+        results.addAll(sgResults);
+      } catch (e) {
+        print('[MetadataFetch] SteamGridDB search error: $e');
+      }
+    }
+
     return results;
   }
 
