@@ -16,6 +16,7 @@ import '../services/pcgamingwiki_service.dart';
 import '../services/windows_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/focus_effect_wrapper.dart';
+import '../widgets/metadata_editor_dialog.dart';
 import '../widgets/screenshot_viewer.dart';
 
 class GameDetailScreen extends ConsumerStatefulWidget {
@@ -370,6 +371,20 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                                 ),
                                 icon: const Icon(Icons.image_search, size: 15),
                                 label: const Text('Fetch Metadata'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _editMetadata,
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                      color: cs.outline.withValues(alpha: 0.25)),
+                                  foregroundColor:
+                                      cs.onSurface.withValues(alpha: 0.65),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.edit_note_rounded, size: 15),
+                                label: const Text('Edit Metadata'),
                               ),
                             ],
                           ),
@@ -761,6 +776,17 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
     await showDialog<bool>(
       context: context,
       builder: (ctx) => ArtPickerDialog(game: liveGame),
+    );
+  }
+
+  Future<void> _editMetadata() async {
+    final liveGame = ref.read(gameLibraryProvider).valueOrNull
+            ?.firstWhere((g) => g.id == widget.game.id,
+                orElse: () => widget.game) ??
+        widget.game;
+    await showDialog<bool>(
+      context: context,
+      builder: (ctx) => MetadataEditorDialog(game: liveGame),
     );
   }
 

@@ -351,7 +351,7 @@ class PcgamingwikiService {
   static String expandForDisplay(String portablePath) {
     final userProfile = Platform.environment['USERPROFILE'] ?? '';
     if (portablePath.startsWith('~/')) {
-      return (userProfile + '\\' + portablePath.substring(2))
+      return ('$userProfile\\${portablePath.substring(2)}')
           .replaceAll('/', '\\');
     }
     return portablePath.replaceAll('/', '\\');

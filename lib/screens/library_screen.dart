@@ -7,6 +7,7 @@ import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../providers/game_library_provider.dart';
+import '../providers/search_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/ui_provider.dart';
@@ -15,6 +16,7 @@ import '../services/windows_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/focus_effect_wrapper.dart';
+import '../widgets/metadata_editor_dialog.dart';
 import '../widgets/save_location_dialog.dart';
 import '../widgets/screenshot_viewer.dart';
 import 'game_detail_screen.dart';
@@ -30,6 +32,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   late FocusNode _focusNode;
   bool _isListView = false;
   Game? _selectedGame;
+  bool _searchOpen = false;
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -41,15 +46,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (_searchOpen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _searchFocusNode.requestFocus();
+        });
+      } else {
+        _searchController.clear();
+        ref.read(searchQueryProvider.notifier).state = '';
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final gamesAsync = ref.watch(gameLibraryProvider);
+    final gamesAsync = ref.watch(searchResultsProvider);
     final theme = ref.watch(themeProvider);
     final inputMode = ref.watch(inputModeProvider);
     final cs = theme.theme.colorScheme;
+    final searchQuery = ref.watch(searchQueryProvider);
 
     return Scaffold(
       body: KeyboardListener(
@@ -58,6 +80,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           if (event is KeyDownEvent) {
             if (event.logicalKey == LogicalKeyboardKey.f5) {
               ref.read(gameLibraryProvider.notifier).rescan();
+            } else if (event.logicalKey == LogicalKeyboardKey.escape && _searchOpen) {
+              _toggleSearch();
             }
           }
         },
@@ -65,7 +89,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           children: [
             // ── Sidebar ──────────────────────────────────────────────────
             _Sidebar(
-              gameCount: gamesAsync.valueOrNull?.length,
+              gameCount: ref.read(gameLibraryProvider).valueOrNull?.length,
               isListView: _isListView,
               onToggleView: (listView) {
                 setState(() {
@@ -76,6 +100,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               },
               onRescan: () => ref.read(gameLibraryProvider.notifier).rescan(),
               onSettings: () => Navigator.of(context).pushNamed('/settings'),
+              onSearch: _toggleSearch,
+              searchActive: _searchOpen,
             ),
 
             // ── Divider ──────────────────────────────────────────────────
@@ -88,6 +114,95 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             Expanded(
               child: Column(
                 children: [
+                  // ── Sliding search bar ────────────────────────────────
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    child: _searchOpen
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: cs.outline.withValues(alpha: 0.1),
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.search_rounded,
+                                  size: 20,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    style: TextStyle(
+                                      color: cs.onSurface,
+                                      fontSize: 14,
+                                    ),
+                                    onChanged: (val) {
+                                      ref.read(searchQueryProvider.notifier).state = val;
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Search games by name, genre, developer...',
+                                      hintStyle: TextStyle(
+                                        color: cs.onSurface.withValues(alpha: 0.35),
+                                        fontSize: 14,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                ),
+                                if (searchQuery.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      ref.read(searchQueryProvider.notifier).state = '';
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: cs.onSurface.withValues(alpha: 0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: cs.onSurface.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: _toggleSearch,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: cs.onSurface.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.keyboard_hide_rounded,
+                                      size: 16,
+                                      color: cs.onSurface.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+
+                  // ── Games content ────────────────────────────────────
                   Expanded(
                     child: gamesAsync.when(
                       loading: () => Center(
@@ -102,6 +217,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ),
                       data: (games) {
                         if (games.isEmpty) {
+                          if (searchQuery.isNotEmpty) {
+                            return _NoSearchResults(query: searchQuery);
+                          }
                           return _EmptyState(
                             onRescan: () => ref.read(gameLibraryProvider.notifier).rescan(),
                           );
@@ -144,6 +262,8 @@ class _Sidebar extends ConsumerWidget {
   final ValueChanged<bool> onToggleView;
   final VoidCallback onRescan;
   final VoidCallback onSettings;
+  final VoidCallback onSearch;
+  final bool searchActive;
 
   const _Sidebar({
     required this.gameCount,
@@ -151,6 +271,8 @@ class _Sidebar extends ConsumerWidget {
     required this.onToggleView,
     required this.onRescan,
     required this.onSettings,
+    required this.onSearch,
+    required this.searchActive,
   });
 
   @override
@@ -197,6 +319,19 @@ class _Sidebar extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
+
+          // Search button
+          Tooltip(
+            message: 'Search',
+            preferBelow: false,
+            child: _SidebarIconButton(
+              icon: Icons.search_rounded,
+              tooltip: 'Search',
+              onTap: onSearch,
+              active: searchActive,
+            ),
+          ),
+          const SizedBox(height: 8),
 
           // Game count badge
           if (gameCount != null) ...[
@@ -332,11 +467,13 @@ class _SidebarIconButton extends ConsumerStatefulWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+  final bool active;
 
   const _SidebarIconButton({
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.active = false,
   });
 
   @override
@@ -349,6 +486,7 @@ class _SidebarIconButtonState extends ConsumerState<_SidebarIconButton> {
   @override
   Widget build(BuildContext context) {
     final cs = ref.watch(themeProvider).theme.colorScheme;
+    final isActive = widget.active;
     return Tooltip(
       message: widget.tooltip,
       preferBelow: false,
@@ -363,14 +501,23 @@ class _SidebarIconButtonState extends ConsumerState<_SidebarIconButton> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: _hovered ? cs.primary.withValues(alpha: 0.15) : Colors.transparent,
+              color: isActive
+                  ? cs.primary.withValues(alpha: 0.18)
+                  : _hovered
+                      ? cs.primary.withValues(alpha: 0.15)
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
+              border: isActive
+                  ? Border.all(color: cs.primary.withValues(alpha: 0.4), width: 1)
+                  : null,
             ),
             child: Icon(
               widget.icon,
-              color: _hovered
+              color: isActive
                   ? cs.primary
-                  : cs.onSurface.withValues(alpha: 0.45),
+                  : _hovered
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.45),
               size: 20,
             ),
           ),
@@ -951,6 +1098,31 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                     ],
                   ),
 
+                  const SizedBox(height: 8),
+
+                  // Edit metadata button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => showDialog<bool>(
+                        context: context,
+                        builder: (_) => MetadataEditorDialog(game: liveGame),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: cs.onSurface.withValues(alpha: 0.7),
+                        side: BorderSide(
+                            color: cs.outline.withValues(alpha: 0.2)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit_note_rounded, size: 15),
+                      label: const Text('Edit Metadata',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+
                   // ── Summary ──────────────────────────────────────────
                   if (meta?.summary != null) ...[
                     const SizedBox(height: 20),
@@ -1228,6 +1400,43 @@ class _PillButtonState extends ConsumerState<_PillButton> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── No search results ────────────────────────────────────────────────────────
+
+class _NoSearchResults extends ConsumerWidget {
+  final String query;
+  const _NoSearchResults({required this.query});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = ref.watch(themeProvider).theme.colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off_rounded, size: 64, color: cs.onSurface.withValues(alpha: 0.12)),
+          const SizedBox(height: 16),
+          Text(
+            'No results for "$query"',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try a different search term',
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.35),
+            ),
+          ),
+        ],
       ),
     );
   }

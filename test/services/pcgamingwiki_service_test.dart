@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_indie/services/pcgamingwiki_service.dart';
 

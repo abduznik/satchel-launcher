@@ -1020,53 +1020,6 @@ class _ValidatedDialogState extends ConsumerState<_ValidatedDialog> {
   }
 }
 
-// ── Styled dialog ─────────────────────────────────────────────────────────────
-
-class _StyledDialog extends ConsumerWidget {
-  final String title;
-  final Widget content;
-  final VoidCallback onSave;
-  final VoidCallback onCancel;
-
-  const _StyledDialog({
-    required this.title,
-    required this.content,
-    required this.onSave,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cs = ref.watch(themeProvider).theme.colorScheme;
-    return Dialog(
-      backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
-            const SizedBox(height: 20),
-            content,
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(onPressed: onCancel, child: Text('Cancel', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)))),
-                const SizedBox(width: 8),
-                _SmallButton(label: 'Save', onTap: onSave),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _DialogField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;

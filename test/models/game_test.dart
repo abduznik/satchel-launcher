@@ -158,7 +158,7 @@ void main() {
         rating: 4.5,
         ratingCount: 100,
         screenshots: ['/s1.jpg', '/s2.jpg'],
-        videos: [IgdbVideo(name: 'Trailer', videoId: 'abc123')],
+        videos: [const IgdbVideo(name: 'Trailer', videoId: 'abc123')],
         steamGridDbId: 'sgdb-1',
         igdbId: 'igdb-2',
         screenScraperId: 'ss-3',
@@ -208,7 +208,7 @@ void main() {
         summary: 'Roundtrip',
         genres: ['FPS', 'Action'],
         rating: 4.2,
-        videos: [IgdbVideo(name: 'Trailer', videoId: 'vid1')],
+        videos: [const IgdbVideo(name: 'Trailer', videoId: 'vid1')],
       );
       final restored = GameMetadata.fromJson(original.toJson());
       expect(restored.summary, original.summary);

@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:project_indie/services/steamgriddb_api.dart';
 import 'package:project_indie/services/igdb_api.dart';
 import 'package:project_indie/services/screenscraper_api.dart';
-import 'package:project_indie/models/api_search_result.dart';
 
 class MockDio extends Mock implements Dio {}
 
