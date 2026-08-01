@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import '../providers/api_provider.dart';
 import '../providers/game_library_provider.dart';
 import '../services/drive_service.dart';
 import '../services/migration_service.dart';
@@ -74,13 +75,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           final result = await MigrationService.migrate();
           if (!mounted) return;
 
-          if (result.success && result.settingsImported) {
-            // Migration successful — go straight to library
-            final hasCached = Hive.box('games').get('games', defaultValue: []) as List;
-            if (hasCached.isNotEmpty) {
-              Navigator.of(context).pushReplacementNamed('/library');
-              ref.read(gameLibraryProvider.notifier).rescan();
-              return;
+          if (result.success) {
+            // Reload API config (keys.enc may have been imported)
+            ref.invalidate(apiConfigProvider);
+
+            if (result.settingsImported) {
+              // Migration successful — go straight to library
+              final hasCached = Hive.box('games').get('games', defaultValue: []) as List;
+              if (hasCached.isNotEmpty) {
+                Navigator.of(context).pushReplacementNamed('/library');
+                ref.read(gameLibraryProvider.notifier).rescan();
+                return;
+              }
             }
           }
         }
