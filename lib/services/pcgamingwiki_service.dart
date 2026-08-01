@@ -38,11 +38,11 @@ class PcgamingwikiService {
     // 1. Exact name
     candidates.add(gameName);
 
-    // 2. Replace dashes/underscores with spaces
-    final spacified = gameName.replaceAll(RegExp(r'[-_]'), ' ').trim();
+    // 2. Replace dashes/underscores/colons with spaces
+    final spacified = gameName.replaceAll(RegExp(r'[-_:]'), ' ').trim();
     if (spacified != gameName) candidates.add(spacified);
 
-    // 3. Strip subtitle (anything after : or –)
+    // 3. Strip subtitle (anything after : or – or —)
     final noSubtitle = gameName.split(RegExp(r'[:\u2013\u2014]')).first.trim();
     if (noSubtitle != gameName && noSubtitle.length > 3) candidates.add(noSubtitle);
 
@@ -63,6 +63,22 @@ class PcgamingwikiService {
     if (words.length > 2) {
       final shortName = words.take(2).join(' ');
       if (!candidates.contains(shortName)) candidates.add(shortName);
+    }
+
+    // 7. Try with "The" moved to end (common PCGW convention: "Game, The")
+    if (gameName.toLowerCase().startsWith('the ')) {
+      final withoutThe = gameName.substring(4).trim();
+      final moved = '$withoutThe, The';
+      if (!candidates.contains(moved)) candidates.add(moved);
+    }
+
+    // 8. Title-case first letter of each word (PCGW uses title case)
+    final titleCase = gameName.split(' ').map((w) {
+      if (w.isEmpty) return w;
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
+    if (!candidates.contains(titleCase) && titleCase != gameName) {
+      candidates.add(titleCase);
     }
 
     return candidates.map((c) => c.trim()).where((c) => c.isNotEmpty).toSet().toList();
