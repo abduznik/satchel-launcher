@@ -35,11 +35,12 @@ class PcgamingwikiService {
   /// Build a list of search candidate strings to try in order.
   List<String> _buildSearchCandidates(String gameName) {
     final candidates = <String>[];
-    // 1. Exact name
+
+    // 1. Exact name (try this first — colons work in PCGW search)
     candidates.add(gameName);
 
-    // 2. Replace dashes/underscores/colons with spaces
-    final spacified = gameName.replaceAll(RegExp(r'[-_:]'), ' ').trim();
+    // 2. Replace dashes/underscores with spaces (but keep colons)
+    final spacified = gameName.replaceAll(RegExp(r'[-_]'), ' ').trim();
     if (spacified != gameName) candidates.add(spacified);
 
     // 3. Strip subtitle (anything after : or – or —)
@@ -52,7 +53,7 @@ class PcgamingwikiService {
       candidates.add(spacifiedNoSub);
     }
 
-    // 5. Remove all punctuation except spaces
+    // 5. Remove ALL punctuation including colons (fallback)
     final noPunct = gameName.replaceAll(RegExp(r"[^\w\s]"), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();

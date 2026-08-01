@@ -12,6 +12,14 @@
 
 Satchel is a game library manager built for people who carry their games on a USB stick. It runs entirely from the drive — all metadata, cover art, settings, and save files live next to your games. Plug in the drive on any Windows PC (or macOS via Crossover, or Linux via Proton), and your library is there with full metadata, artwork, and save synchronization.
 
+<p align="center">
+  <img src="assets/screenshot_1.png" alt="Satchel Library View" width="800">
+</p>
+
+<p align="center">
+  <img src="assets/screenshot_2.png" alt="Satchel Game Detail" width="800">
+</p>
+
 ## How It Works
 
 ### The Drive
