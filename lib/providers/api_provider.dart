@@ -4,6 +4,7 @@ import '../services/steamgriddb_api.dart';
 import '../services/igdb_api.dart';
 import '../services/screenscraper_api.dart';
 import '../services/encryption_service.dart';
+import '../services/metadata_fetch_service.dart';
 
 final encryptionServiceProvider = Provider<EncryptionService>((ref) {
   return EncryptionService();
@@ -22,10 +23,14 @@ class ApiConfigNotifier extends StateNotifier<ApiConfig> {
   }
 
   Future<void> _loadConfig() async {
+    print('[ApiConfigNotifier] Loading API config...');
     try {
       final encrypted = await _ref.read(encryptionServiceProvider).loadEncrypted();
-      state = ApiConfig.fromJson(encrypted.map((k, v) => MapEntry(k, v)));
-    } catch (_) {
+      print('[ApiConfigNotifier] Loaded keys: ${encrypted.keys.toList()}');
+      state = ApiConfig.fromMap(encrypted);
+      print('[ApiConfigNotifier] Config: steamGridDb=${state.steamGridDbEnabled}, igdb=${state.igdbEnabled}, ss=${state.screenScraperEnabled}');
+    } catch (e) {
+      print('[ApiConfigNotifier] Error loading config: $e');
       state = ApiConfig();
     }
   }
@@ -59,35 +64,55 @@ class ApiConfigNotifier extends StateNotifier<ApiConfig> {
   }
 
   Future<void> _saveConfig() async {
-    final data = state.toJson();
-    final stringData = data.map((k, v) => MapEntry(k, v?.toString() ?? ''));
-    await _ref.read(encryptionServiceProvider).saveEncrypted(stringData);
+    final data = state.toMap();
+    print('[ApiConfigNotifier] Saving config: ${data.keys.toList()}');
+    await _ref.read(encryptionServiceProvider).saveEncrypted(data);
   }
 }
 
 final steamGridDbProvider = Provider<SteamGridDbApi>((ref) {
   final config = ref.watch(apiConfigProvider);
   final api = SteamGridDbApi();
-  if (config.steamGridDbKey != null) {
+  if (config.steamGridDbKey != null && config.steamGridDbKey!.isNotEmpty) {
     api.setApiKey(config.steamGridDbKey!);
   }
   return api;
 });
 
+// Cache for authenticated IGDB instances keyed by clientId+secret
+final _igdbCache = <String, IgdbApi>{};
+
 final igdbProvider = Provider<IgdbApi>((ref) {
   final config = ref.watch(apiConfigProvider);
+  final clientId = config.igdbClientId ?? '';
+  final clientSecret = config.igdbClientSecret ?? '';
+
+  if (clientId.isEmpty || clientSecret.isEmpty) return IgdbApi();
+
+  final cacheKey = '$clientId:$clientSecret';
+  if (_igdbCache.containsKey(cacheKey)) return _igdbCache[cacheKey]!;
+
   final api = IgdbApi();
-  if (config.igdbClientId != null && config.igdbClientSecret != null) {
-    api.authenticate(config.igdbClientId!, config.igdbClientSecret!);
-  }
+  _igdbCache[cacheKey] = api;
+  // Authenticate eagerly; search() checks isAuthenticated before calling
+  api.authenticate(clientId, clientSecret);
   return api;
 });
 
 final screenScraperProvider = Provider<ScreenScraperApi>((ref) {
   final config = ref.watch(apiConfigProvider);
   final api = ScreenScraperApi();
-  if (config.screenScraperUsername != null && config.screenScraperPassword != null) {
+  if (config.screenScraperUsername != null && config.screenScraperPassword != null &&
+      config.screenScraperUsername!.isNotEmpty && config.screenScraperPassword!.isNotEmpty) {
     api.setCredentials(config.screenScraperUsername!, config.screenScraperPassword!);
   }
   return api;
+});
+
+final metadataFetchServiceProvider = Provider<MetadataFetchService>((ref) {
+  final config = ref.watch(apiConfigProvider);
+  return MetadataFetchService(
+    steamGridDb: config.steamGridDbEnabled ? ref.read(steamGridDbProvider) : null,
+    igdb: config.igdbEnabled ? ref.read(igdbProvider) : null,
+  );
 });

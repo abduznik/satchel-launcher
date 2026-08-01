@@ -1,33 +1,33 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
-import 'pcgamingwiki_service.dart';
+import 'drive_service.dart';
 
 class OmniSaveService {
   final String savesBasePath;
-  final PcgamingwikiService _pcgamingwiki;
 
   OmniSaveService({
-    required this.savesBasePath,
-    PcgamingwikiService? pcgamingwiki,
-  }) : _pcgamingwiki = pcgamingwiki ?? PcgamingwikiService();
+    String? savesBasePath,
+  }) : savesBasePath = savesBasePath ?? DriveService.savesPath;
 
-  /// Path to OmniSave.exe bundled in thirdparty/
-  String get _bundledOmniSavePath {
-    // In development, use thirdparty/ folder
-    // In production, use the app's asset directory
-    final appDir = p.dirname(p.dirname(p.dirname(Platform.resolvedExecutable)));
-    final thirdpartyPath = p.join(appDir, 'thirdparty', 'OmniSave.exe');
-
-    // Fallback to development path
-    if (!File(thirdpartyPath).existsSync()) {
-      return p.join(Directory.current.path, 'thirdparty', 'OmniSave.exe');
+  /// Extracts OmniSave.exe from Flutter assets to the .indie folder.
+  /// Returns the path if successful, null if the asset isn't bundled.
+  Future<String?> _extractOmniSave(String indieDirPath) async {
+    final destFile = File(p.join(indieDirPath, 'OmniSave.exe'));
+    if (await destFile.exists()) return destFile.path;
+    try {
+      final data = await rootBundle.load('thirdparty/OmniSave.exe');
+      final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      await destFile.writeAsBytes(bytes);
+      print('[OmniSave] Extracted OmniSave.exe to ${destFile.path}');
+      return destFile.path;
+    } catch (e) {
+      print('[OmniSave] OmniSave.exe not found in assets: $e');
+      return null;
     }
-
-    return thirdpartyPath;
   }
 
-  /// Generate OmniSave.ini with auto-detected or provided save path
   Future<void> generateConfig(
     Game game, {
     String? localSavePath,
@@ -38,60 +38,34 @@ class OmniSaveService {
       await indieDir.create(recursive: true);
     }
 
+    // Just the exe filename — OmniSave sets working dir to the game folder and launches from there
     final exeName = p.basename(game.exePath);
     final gameSavesDir = p.join(savesBasePath, game.name);
 
-    // Use provided path or attempt PCGamingWiki detection
     String resolvedLocalPath;
     if (localSavePath != null && localSavePath.isNotEmpty) {
       resolvedLocalPath = localSavePath;
     } else {
-      resolvedLocalPath = await _detectSavePath(game);
+      resolvedLocalPath = _defaultSavePath(game);
     }
 
-    final iniContent = '''
-[OmniSave]
-Launch_Command=$exeName
-Launch_Args=${gameArgs ?? ''}
-Local_Path=$resolvedLocalPath
-Remote_Path=$gameSavesDir
-''';
+    final iniContent = '[OmniSave]\n'
+        'Launch_Command=$exeName\n'
+        'Launch_Args=${gameArgs ?? ''}\n'
+        'Local_Path=$resolvedLocalPath\n'
+        'Remote_Path=$gameSavesDir\n';
 
-    final iniFile = File(p.join(indieDir.path, 'omnisave.ini'));
+    // Write OmniSave.ini to the game folder — OmniSave looks for it next to itself
+    final iniFile = File(p.join(game.folderPath, 'OmniSave.ini'));
     await iniFile.writeAsString(iniContent);
 
-    // Ensure saves directory exists
+    // Also keep a copy in .indie/ for reference
+    final indieIni = File(p.join(indieDir.path, 'omnisave.ini'));
+    await indieIni.writeAsString(iniContent);
+
     final savesDir = Directory(gameSavesDir);
     if (!await savesDir.exists()) {
       await savesDir.create(recursive: true);
-    }
-  }
-
-  /// Attempt to detect save path using PCGamingWiki
-  Future<String> _detectSavePath(Game game) async {
-    try {
-      // Search PCGamingWiki for the game
-      final results = await _pcgamingwiki.search(game.name);
-      if (results.isEmpty) {
-        return _defaultSavePath(game);
-      }
-
-      // Try to get save locations from the first result
-      final saveInfo = await _pcgamingwiki.getSaveLocations(results.first.url);
-      if (saveInfo == null || saveInfo.locations.isEmpty) {
-        return _defaultSavePath(game);
-      }
-
-      // Find Windows save location
-      final windowsSave = saveInfo.locations.firstWhere(
-        (loc) => loc.platform == 'Windows' && loc.type == SaveLocationType.saves,
-        orElse: () => saveInfo.locations.first,
-      );
-
-      // Expand the path
-      return _pcgamingwiki.expandPath(windowsSave.path);
-    } catch (_) {
-      return _defaultSavePath(game);
     }
   }
 
@@ -104,55 +78,38 @@ Remote_Path=$gameSavesDir
     );
   }
 
-  /// Launch game via OmniSave with full lifecycle management
-  Future<void> launchGame(
+  /// Launches the game via OmniSave if the exe is available.
+  /// Returns true if launched via OmniSave, false if OmniSave.exe was not found
+  /// (caller should fall back to direct launch).
+  Future<bool> launchGame(
     Game game, {
     String? localSavePath,
     String? gameArgs,
   }) async {
-    // Generate fresh config
     await generateConfig(game, localSavePath: localSavePath, gameArgs: gameArgs);
 
-    // Copy OmniSave.exe to game's .indie directory for isolated execution
-    final indieOmniSave = File(
-      p.join(game.folderPath, '.indie', 'OmniSave.exe'),
-    );
-    if (!await indieOmniSave.exists()) {
-      await File(_bundledOmniSavePath).copy(indieOmniSave.path);
+    // Extract OmniSave.exe into the game folder — it must sit next to OmniSave.ini
+    final omniSavePath = await _extractOmniSave(game.folderPath);
+    if (omniSavePath == null) {
+      print('[OmniSave] OmniSave.exe unavailable — falling back to direct launch');
+      return false;
     }
 
-    // Copy the ini file next to OmniSave.exe
-    final sourceIni = File(p.join(game.folderPath, '.indie', 'omnisave.ini'));
-    final destIni = File(
-      p.join(game.folderPath, '.indie', 'OmniSave.ini'),
-    );
-    if (await sourceIni.exists()) {
-      await sourceIni.copy(destIni.path);
-    }
-
-    // Launch OmniSave.exe which will handle the full lifecycle
+    print('[OmniSave] Launching via OmniSave: $omniSavePath');
     await Process.start(
-      indieOmniSave.path,
+      omniSavePath,
       [],
       workingDirectory: game.folderPath,
-      mode: ProcessStartMode.normal,
+      mode: ProcessStartMode.detached,
     );
+    return true;
   }
 
-  /// Clean up OmniSave files after launch
   Future<void> cleanupAfterLaunch(Game game) async {
-    final indieOmniSave = File(
-      p.join(game.folderPath, '.indie', 'OmniSave.exe'),
-    );
-    if (await indieOmniSave.exists()) {
-      await indieOmniSave.delete();
-    }
-
-    final iniCopy = File(
-      p.join(game.folderPath, '.indie', 'OmniSave.ini'),
-    );
-    if (await iniCopy.exists()) {
-      await iniCopy.delete();
+    // Remove OmniSave.exe and OmniSave.ini from the game folder after use
+    for (final name in ['OmniSave.exe', 'OmniSave.ini']) {
+      final f = File(p.join(game.folderPath, name));
+      if (await f.exists()) await f.delete();
     }
   }
 }

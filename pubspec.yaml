@@ -23,7 +23,8 @@ dependencies:
   uuid: ^4.2.1
   collection: ^1.18.0
   shared_preferences: ^2.2.2
-
+  file_picker: ^11.0.3
+  gamepads: ^0.1.10+5
 dev_dependencies:
   flutter_test:
     sdk: flutter

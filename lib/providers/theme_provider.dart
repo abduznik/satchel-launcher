@@ -33,156 +33,174 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemePreset _getThemePreset(AppTheme theme) {
     switch (theme) {
-      case AppTheme.defaultDark:
-        return _defaultDarkTheme();
-      case AppTheme.light:
-        return _lightTheme();
-      case AppTheme.crimson:
-        return _crimsonTheme();
-      case AppTheme.roseGold:
-        return _roseGoldTheme();
-      case AppTheme.neonCyan:
-        return _neonCyanTheme();
-      case AppTheme.oledBlack:
-        return _oledBlackTheme();
+      case AppTheme.defaultDark: return _defaultDarkTheme();
+      case AppTheme.light:       return _lightTheme();
+      case AppTheme.crimson:     return _crimsonTheme();
+      case AppTheme.roseGold:    return _roseGoldTheme();
+      case AppTheme.neonCyan:    return _neonCyanTheme();
+      case AppTheme.oledBlack:   return _oledBlackTheme();
     }
   }
 
   ThemePreset _defaultDarkTheme() {
+    const bg    = Color(0xFF0E0E16);
+    const surf  = Color(0xFF161622);
+    const acc   = Color(0xFF7C3AED);
     return ThemePreset(
       name: 'Default Dark',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: acc,
+          secondary: const Color(0xFF9F67FF),
+          surface: surf,
+          onSurface: const Color(0xFFE2E2F0),
+          outline: const Color(0xFF2E2E45),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0f0f23),
+        scaffoldBackgroundColor: bg,
         cardTheme: CardThemeData(
-          color: const Color(0xFF16213e),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1a1a2e),
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
+        appBarTheme: const AppBarTheme(backgroundColor: surf, elevation: 0),
+        dividerTheme: const DividerThemeData(color: Color(0xFF2E2E45), thickness: 1),
       ),
     );
   }
 
   ThemePreset _lightTheme() {
+    const bg   = Color(0xFFF5F5FA);
+    const surf = Color(0xFFFFFFFF);
+    const acc  = Color(0xFF7C3AED);
     return ThemePreset(
       name: 'Light',
       theme: ThemeData(
         brightness: Brightness.light,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
+        colorScheme: ColorScheme.light(
+          primary: acc,
+          secondary: const Color(0xFF9F67FF),
+          surface: surf,
+          onSurface: const Color(0xFF1A1A2E),
+          outline: const Color(0xFFE0E0F0),
         ),
+        scaffoldBackgroundColor: bg,
+        cardTheme: CardThemeData(
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
+        ),
+        dividerTheme: const DividerThemeData(color: Color(0xFFE8E8F5), thickness: 1),
       ),
     );
   }
 
   ThemePreset _crimsonTheme() {
+    const bg   = Color(0xFF0F0A0A);
+    const surf = Color(0xFF1A0F0F);
+    const acc  = Color(0xFFDC2626);
     return ThemePreset(
       name: 'Crimson',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.redAccent,
-          brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: acc,
+          secondary: const Color(0xFFEF4444),
+          surface: surf,
+          onSurface: const Color(0xFFF0E0E0),
+          outline: const Color(0xFF2E1515),
         ),
-        scaffoldBackgroundColor: const Color(0xFF1a0a0a),
+        scaffoldBackgroundColor: bg,
         cardTheme: CardThemeData(
-          color: const Color(0xFF2d1515),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2d1515),
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
+        dividerTheme: const DividerThemeData(color: Color(0xFF2E1515), thickness: 1),
       ),
     );
   }
 
   ThemePreset _roseGoldTheme() {
+    const bg   = Color(0xFF100C0E);
+    const surf = Color(0xFF1A1217);
+    const acc  = Color(0xFFEC4899);
     return ThemePreset(
       name: 'Rose Gold',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.pinkAccent,
-          brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: acc,
+          secondary: const Color(0xFFF472B6),
+          surface: surf,
+          onSurface: const Color(0xFFF0E4EC),
+          outline: const Color(0xFF2E1A25),
         ),
-        scaffoldBackgroundColor: const Color(0xFF1a1015),
+        scaffoldBackgroundColor: bg,
         cardTheme: CardThemeData(
-          color: const Color(0xFF2d1a25),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2d1a25),
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
+        dividerTheme: const DividerThemeData(color: Color(0xFF2E1A25), thickness: 1),
       ),
     );
   }
 
   ThemePreset _neonCyanTheme() {
+    const bg   = Color(0xFF080F10);
+    const surf = Color(0xFF0F1A1C);
+    const acc  = Color(0xFF06B6D4);
     return ThemePreset(
       name: 'Neon Cyan',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.cyanAccent,
-          brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: acc,
+          secondary: const Color(0xFF22D3EE),
+          surface: surf,
+          onSurface: const Color(0xFFD0F0F5),
+          outline: const Color(0xFF102030),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0a1a1a),
+        scaffoldBackgroundColor: bg,
         cardTheme: CardThemeData(
-          color: const Color(0xFF152d2d),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF152d2d),
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
+        dividerTheme: const DividerThemeData(color: Color(0xFF102030), thickness: 1),
       ),
     );
   }
 
   ThemePreset _oledBlackTheme() {
+    const bg   = Color(0xFF000000);
+    const surf = Color(0xFF0A0A0A);
+    const acc  = Color(0xFFE5E5E5);
     return ThemePreset(
       name: 'OLED Black',
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.grey,
-          brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: acc,
+          secondary: const Color(0xFFAAAAAA),
+          surface: surf,
+          onSurface: const Color(0xFFE8E8E8),
+          outline: const Color(0xFF1A1A1A),
         ),
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: bg,
         cardTheme: CardThemeData(
-          color: const Color(0xFF0a0a0a),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
+          color: surf,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
         ),
+        dividerTheme: const DividerThemeData(color: Color(0xFF1A1A1A), thickness: 1),
       ),
     );
   }

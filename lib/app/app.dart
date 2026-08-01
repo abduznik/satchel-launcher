@@ -21,12 +21,14 @@ class _ProjectIndieAppState extends ConsumerState<ProjectIndieApp> {
   @override
   void initState() {
     super.initState();
-    gamepadService.startPolling();
+    // Initialize the real Riverpod gamepad service (reads after first frame)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(gamepadServiceProvider);
+    });
   }
 
   @override
   void dispose() {
-    gamepadService.dispose();
     super.dispose();
   }
 

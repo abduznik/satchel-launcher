@@ -41,6 +41,13 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
     }
 
     if (ref.read(apiConfigProvider).igdbEnabled) {
+      // Wait up to 3s for IGDB auth token if not yet ready
+      if (!igdbApi.isAuthenticated) {
+        for (var i = 0; i < 30; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (igdbApi.isAuthenticated) break;
+        }
+      }
       final igdbResults = await igdbApi.search(widget.game.name);
       results.addAll(igdbResults);
     }
@@ -150,22 +157,17 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
                     return ListTile(
                       selected: isSelected,
                       selectedTileColor: const Color(0xFFe94560).withValues(alpha: 0.2),
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF16213e),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            result.source[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: result.thumbnailUrl != null
+                            ? Image.network(
+                                result.thumbnailUrl!,
+                                width: 40,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _sourceIcon(result.source),
+                              )
+                            : _sourceIcon(result.source),
                       ),
                       title: Text(
                         result.name,
@@ -223,6 +225,20 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
     );
   }
 
+  Widget _sourceIcon(String source) {
+    return Container(
+      width: 40,
+      height: 56,
+      color: const Color(0xFF16213e),
+      child: Center(
+        child: Text(
+          source[0].toUpperCase(),
+          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
   Future<void> _applySelection() async {
     if (_selectedId == null || _selectedSource == null) return;
 
@@ -234,8 +250,18 @@ class _MetadataPickerState extends ConsumerState<MetadataPicker> {
       coverUrl = await ref.read(steamGridDbProvider).getCoverUrl(_selectedId!);
     } else if (_selectedSource == 'igdb') {
       metadata = await ref.read(igdbProvider).getGameDetails(_selectedId!);
+      coverUrl = await ref.read(igdbProvider).getCoverUrl(_selectedId!);
     } else if (_selectedSource == 'screenscraper') {
       coverUrl = await ref.read(screenScraperProvider).getCoverUrl(_selectedId!);
+    }
+
+    // Fall back to thumbnail from search result if no dedicated cover URL
+    if (coverUrl == null) {
+      final result = _searchResults.firstWhere(
+        (r) => r.id == _selectedId && r.source == _selectedSource,
+        orElse: () => _searchResults.first,
+      );
+      coverUrl = result.thumbnailUrl;
     }
 
     if (mounted) {

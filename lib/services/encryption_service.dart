@@ -1,11 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
-import 'package:encrypt/encrypt.dart';
-
-import 'package:path_provider/path_provider.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 import 'package:path/path.dart' as p;
-import 'dart:io';
+import 'drive_service.dart';
 
 class EncryptionService {
   static const _keyFile = 'keys.enc';
@@ -15,10 +14,10 @@ class EncryptionService {
 
   EncryptionService() {
     _machineKey = _deriveMachineKey();
+    print('[EncryptionService] Storage: ${_getStoragePath()}');
   }
 
   String _deriveMachineKey() {
-    // Derive a machine-specific key from hostname + username
     final hostname = Platform.localHostname;
     final username = Platform.environment['USERNAME'] ??
         Platform.environment['USER'] ??
@@ -29,52 +28,62 @@ class EncryptionService {
     return digest.toString().substring(0, 32);
   }
 
-  Future<String> _getStoragePath() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return p.join(dir.path, _keyFile);
+  String _getStoragePath() {
+    return p.join(DriveService.configPath, _keyFile);
   }
 
   Future<void> saveEncrypted(Map<String, String> data) async {
-    final json = jsonEncode(data);
-    final key = Key.fromUtf8(_machineKey);
-    final iv = IV.fromSecureRandom(_ivLength);
-    final encrypter = Encrypter(AES(key, mode: AESMode.cbc));
-    final encrypted = encrypter.encrypt(json, iv: iv);
+    try {
+      print('[EncryptionService] Saving ${data.length} keys');
+      final json = jsonEncode(data);
+      final key = enc.Key.fromUtf8(_machineKey);
+      final iv = enc.IV.fromSecureRandom(_ivLength);
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+      final encrypted = encrypter.encrypt(json, iv: iv);
 
-    final filePath = await _getStoragePath();
-    final file = File(filePath);
+      final filePath = _getStoragePath();
+      final dir = Directory(p.dirname(filePath));
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
 
-    // IV + encrypted data
-    final combined = Uint8List.fromList(
-      iv.bytes + encrypted.bytes,
-    );
-
-    await file.writeAsBytes(combined);
+      final file = File(filePath);
+      final combined = Uint8List.fromList(iv.bytes + encrypted.bytes);
+      await file.writeAsBytes(combined);
+      print('[EncryptionService] Saved OK ($filePath, ${combined.length} bytes)');
+    } catch (e) {
+      print('[EncryptionService] SAVE ERROR: $e');
+    }
   }
 
   Future<Map<String, String>> loadEncrypted() async {
-    final filePath = await _getStoragePath();
-    final file = File(filePath);
-
-    if (!await file.exists()) {
-      return {};
-    }
-
-    final combined = await file.readAsBytes();
-    if (combined.length < _ivLength) {
-      return {};
-    }
-
-    final iv = IV(combined.sublist(0, _ivLength));
-    final encrypted = Encrypted(combined.sublist(_ivLength));
-    final key = Key.fromUtf8(_machineKey);
-    final encrypter = Encrypter(AES(key, mode: AESMode.cbc));
-
     try {
+      final filePath = _getStoragePath();
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        print('[EncryptionService] No file at $filePath');
+        return {};
+      }
+
+      final combined = await file.readAsBytes();
+      if (combined.length < _ivLength) {
+        print('[EncryptionService] File too small');
+        return {};
+      }
+
+      final iv = enc.IV(combined.sublist(0, _ivLength));
+      final encrypted = enc.Encrypted(combined.sublist(_ivLength));
+      final key = enc.Key.fromUtf8(_machineKey);
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+
       final decrypted = encrypter.decrypt(encrypted, iv: iv);
       final data = jsonDecode(decrypted) as Map<String, dynamic>;
-      return data.map((k, v) => MapEntry(k, v.toString()));
-    } catch (_) {
+      final result = data.map((k, v) => MapEntry(k, v.toString()));
+      print('[EncryptionService] Loaded OK: ${result.keys.toList()}');
+      return result;
+    } catch (e) {
+      print('[EncryptionService] LOAD ERROR: $e');
       return {};
     }
   }

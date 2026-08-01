@@ -1,12 +1,14 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import '../providers/settings_provider.dart';
 import '../providers/api_provider.dart';
 import '../providers/game_library_provider.dart';
 import '../services/autostart_service.dart';
-
+import '../services/drive_service.dart';
+import '../widgets/focus_effect_wrapper.dart';
+import 'package:file_picker/file_picker.dart';
 
 class SetupWizardScreen extends ConsumerStatefulWidget {
   const SetupWizardScreen({super.key});
@@ -17,24 +19,23 @@ class SetupWizardScreen extends ConsumerStatefulWidget {
 
 class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   int _currentStep = 0;
-  bool _isDetecting = false;
-  String? _detectedDrive;
-  String? _gamesPath;
-  String? _savesPath;
+  String _gamesPath = '';
+  String _savesPath = '';
 
-  // API Controllers
   final _steamGridDbController = TextEditingController();
   final _igdbClientController = TextEditingController();
   final _igdbSecretController = TextEditingController();
   final _screenScraperUserController = TextEditingController();
   final _screenScraperPassController = TextEditingController();
-
   final _autostartService = AutostartService();
 
   @override
   void initState() {
     super.initState();
-    _detectDrive();
+    _gamesPath = p.join(p.dirname(DriveService.appDir), 'Games');
+    _savesPath = p.join(p.dirname(DriveService.appDir), 'Saves');
+    print('[SetupWizard] Default games: $_gamesPath');
+    print('[SetupWizard] Default saves: $_savesPath');
   }
 
   @override
@@ -47,35 +48,21 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
     super.dispose();
   }
 
-  Future<void> _detectDrive() async {
-    setState(() => _isDetecting = true);
-
-    // Check common drive letters for Indie Lib
-    final drives = ['H:', 'I:', 'J:', 'K:', 'G:', 'F:', 'E:'];
-
-    for (final drive in drives) {
-      final indieMarker = File(p.join(drive, 'OmniSave.exe'));
-      if (await indieMarker.exists()) {
-        setState(() {
-          _detectedDrive = drive;
-          _gamesPath = p.join(drive, 'Games');
-          _savesPath = p.join(drive, 'Saves');
-          _isDetecting = false;
-        });
-        return;
-      }
+  Future<void> _pickFolder(String field) async {
+    final result = await FilePicker.getDirectoryPath(dialogTitle: 'Select $field directory');
+    if (result != null && mounted) {
+      setState(() {
+        if (field == 'Games') _gamesPath = result;
+        if (field == 'Saves') _savesPath = result;
+      });
     }
-
-    setState(() {
-      _detectedDrive = null;
-      _isDetecting = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0f0f23),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -83,68 +70,20 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Header
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16213e),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.gamepad_rounded,
-                  size: 40,
-                  color: Color(0xFFe94560),
-                ),
-              ),
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(20)), child: Icon(Icons.gamepad_rounded, size: 40, color: theme.colorScheme.primary)),
               const SizedBox(height: 24),
-              const Text(
-                'Project Indie Setup',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+              Text('Project Indie Setup', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
-              Text(
-                _getStepSubtitle(),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                ),
-              ),
+              Text(_getStepSubtitle(), style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 14)),
               const SizedBox(height: 48),
-
-              // Step content
-              Expanded(
-                child: _buildCurrentStep(),
-              ),
-
-              // Navigation
+              Expanded(child: _buildCurrentStep()),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (_currentStep > 0)
-                    TextButton(
-                      onPressed: () => setState(() => _currentStep--),
-                      child: const Text('Back'),
-                    )
-                  else
-                    const SizedBox(),
-                  ElevatedButton(
-                    onPressed: _isDetecting ? null : _nextStep,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFe94560),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                    ),
-                    child: Text(
-                      _currentStep == 3 ? 'Complete Setup' : 'Next',
-                      style: const TextStyle(color: Colors.white),
-                    ),
+                  if (_currentStep > 0) FocusEffectWrapper(onTap: () => setState(() => _currentStep--), child: Padding(padding: const EdgeInsets.all(12), child: Text('Back', style: TextStyle(color: theme.colorScheme.primary)))) else const SizedBox(),
+                  FocusEffectWrapper(
+                    onTap: _nextStep,
+                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(8)), child: Text(_currentStep == 3 ? 'Start' : 'Next', style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold))),
                   ),
                 ],
               ),
@@ -157,188 +96,49 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
 
   String _getStepSubtitle() {
     switch (_currentStep) {
-      case 0:
-        return 'Detecting your drive...';
-      case 1:
-        return 'Configure your game library';
-      case 2:
-        return 'Set up image scraping APIs';
-      case 3:
-        return 'Review and complete';
-      default:
-        return '';
+      case 0: return 'Configure your directories';
+      case 1: return 'Set up image scraping APIs';
+      case 2: return 'AutoStart for your drive';
+      case 3: return 'Ready to go!';
+      default: return '';
     }
   }
 
   Widget _buildCurrentStep() {
     switch (_currentStep) {
-      case 0:
-        return _buildDriveDetectionStep();
-      case 1:
-        return _buildPathsStep();
-      case 2:
-        return _buildApiKeysStep();
-      case 3:
-        return _buildReviewStep();
-      default:
-        return const SizedBox();
+      case 0: return _buildPathsStep();
+      case 1: return _buildApiKeysStep();
+      case 2: return _buildAutostartStep();
+      case 3: return _buildReviewStep();
+      default: return const SizedBox();
     }
-  }
-
-  Widget _buildDriveDetectionStep() {
-    if (_isDetecting) {
-      return const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFe94560)),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Scanning drives for Indie Lib...',
-            style: TextStyle(color: Colors.white70),
-          ),
-        ],
-      );
-    }
-
-    if (_detectedDrive != null) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.check_circle,
-            size: 64,
-            color: Colors.green,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Drive Found!',
-            style: TextStyle(
-              fontSize: 20,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF16213e),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _detectedDrive!,
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFe94560),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.usb_off,
-          size: 64,
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'No drive detected',
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.white.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Please insert your Indie Lib drive\nand click Detect Drive',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-          ),
-        ),
-        const SizedBox(height: 24),
-        OutlinedButton(
-          onPressed: _detectDrive,
-          child: const Text('Detect Drive'),
-        ),
-      ],
-    );
   }
 
   Widget _buildPathsStep() {
+    final theme = Theme.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _pathField(
-          label: 'Games Location',
-          value: _gamesPath ?? '',
-          icon: Icons.folder,
-          onChanged: (v) => setState(() => _gamesPath = v),
-        ),
+        _pathPicker('Games Directory', _gamesPath, () => _pickFolder('Games')),
         const SizedBox(height: 16),
-        _pathField(
-          label: 'Saves Backup Location',
-          value: _savesPath ?? '',
-          icon: Icons.save,
-          onChanged: (v) => setState(() => _savesPath = v),
-        ),
+        _pathPicker('Saves Directory', _savesPath, () => _pickFolder('Saves')),
         const SizedBox(height: 24),
-        Text(
-          'These paths are where your games and save backups will be stored.',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-            fontSize: 12,
-          ),
-        ),
+        Text('Browse to select where your game folders and save backups live.', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12)),
       ],
     );
   }
 
-  Widget _pathField({
-    required String label,
-    required String value,
-    required IconData icon,
-    required ValueChanged<String> onChanged,
-  }) {
+  Widget _pathPicker(String label, String path, VoidCallback onTap) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16213e),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFFe94560)),
+          Icon(Icons.folder, color: theme.colorScheme.primary),
           const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12)), const SizedBox(height: 4), Text(path, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontFamily: 'monospace'))])),
+          FocusEffectWrapper(onTap: onTap, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)), child: Text('Browse', style: TextStyle(color: theme.colorScheme.primary, fontSize: 12, fontWeight: FontWeight.w500)))),
         ],
       ),
     );
@@ -349,268 +149,115 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _apiKeySection(
-            title: 'SteamGridDB',
-            subtitle: 'For grid art and covers (Free)',
-            children: [
-              _apiKeyInput(
-                controller: _steamGridDbController,
-                hint: 'API Key',
-                isObscured: true,
-              ),
-            ],
-          ),
+          _apiKeySection('SteamGridDB', 'Grid art and covers (Free)', [_apiKeyInput(_steamGridDbController, 'API Key', true)]),
           const SizedBox(height: 16),
-          _apiKeySection(
-            title: 'IGDB',
-            subtitle: 'For game info and metadata (Free via Twitch)',
-            children: [
-              _apiKeyInput(
-                controller: _igdbClientController,
-                hint: 'Client ID',
-              ),
-              const SizedBox(height: 8),
-              _apiKeyInput(
-                controller: _igdbSecretController,
-                hint: 'Client Secret',
-                isObscured: true,
-              ),
-            ],
-          ),
+          _apiKeySection('IGDB', 'Game info and metadata (Free via Twitch)', [_apiKeyInput(_igdbClientController, 'Client ID', false), const SizedBox(height: 8), _apiKeyInput(_igdbSecretController, 'Client Secret', true)]),
           const SizedBox(height: 16),
-          _apiKeySection(
-            title: 'ScreenScraper',
-            subtitle: 'For box art and screenshots (Free tier)',
-            children: [
-              _apiKeyInput(
-                controller: _screenScraperUserController,
-                hint: 'Username',
-              ),
-              const SizedBox(height: 8),
-              _apiKeyInput(
-                controller: _screenScraperPassController,
-                hint: 'Password',
-                isObscured: true,
-              ),
-            ],
-          ),
+          _apiKeySection('ScreenScraper', 'Box art and screenshots (Free tier)', [_apiKeyInput(_screenScraperUserController, 'Username', false), const SizedBox(height: 8), _apiKeyInput(_screenScraperPassController, 'Password', true)]),
           const SizedBox(height: 24),
-          Text(
-            'All keys are stored encrypted on your drive.\nYou can skip this and add them later in Settings.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 12,
-            ),
-          ),
+          Text('All keys are stored encrypted on your drive.\nYou can skip this and add later in Settings.', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12)),
         ],
       ),
     );
   }
 
-  Widget _apiKeySection({
-    required String title,
-    required String subtitle,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16213e),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
+  Widget _apiKeySection(String title, String subtitle, List<Widget> children) {
+    final theme = Theme.of(context);
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12)), const SizedBox(height: 12), ...children]));
   }
 
-  Widget _apiKeyInput({
-    required TextEditingController controller,
-    required String hint,
-    bool isObscured = false,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isObscured,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-        filled: true,
-        fillColor: const Color(0xFF0f0f23),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFe94560)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-      ),
-    );
+  Widget _apiKeyInput(TextEditingController ctrl, String hint, bool obscure) {
+    final theme = Theme.of(context);
+    return TextField(controller: ctrl, obscureText: obscure, style: TextStyle(color: theme.colorScheme.onSurface), decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.3)), filled: true, fillColor: theme.scaffoldBackgroundColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.2))), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.2))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.colorScheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)));
   }
 
-  Widget _buildReviewStep() {
+  Widget _buildAutostartStep() {
+    final theme = Theme.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(
-          Icons.check_circle_outline,
-          size: 64,
-          color: Color(0xFFe94560),
-        ),
+        Icon(Icons.usb, size: 64, color: theme.colorScheme.primary),
         const SizedBox(height: 16),
-        const Text(
-          'Setup Complete!',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+        Text('Portable AutoStart', style: TextStyle(fontSize: 20, color: theme.colorScheme.onSurface)),
+        const SizedBox(height: 8),
+        Text('Generate AutoRun.inf so this app auto-launches\nwhen the drive is plugged into a Windows PC.', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 14)),
         const SizedBox(height: 24),
-        _reviewItem('Drive', _detectedDrive ?? 'Not set'),
-        const SizedBox(height: 8),
-        _reviewItem('Games', _gamesPath ?? 'Not set'),
-        const SizedBox(height: 8),
-        _reviewItem('Saves', _savesPath ?? 'Not set'),
-        const SizedBox(height: 8),
-        _reviewItem(
-          'APIs',
-          '${_getEnabledApisCount()} configured',
-        ),
-        const SizedBox(height: 32),
-        Text(
-          'You can change these anytime in Settings.',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-            fontSize: 12,
-          ),
+        FocusEffectWrapper(
+          onTap: () async {
+            final exePath = p.join(DriveService.appDir, 'project_indie.exe');
+            await _autostartService.generateAutoRunInf(DriveService.appDir, exePath);
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AutoRun.inf created!'), backgroundColor: Colors.green));
+          },
+          child: Container(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(8)), child: const Text('Generate AutoRun.inf', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
         ),
       ],
     );
   }
 
-  Widget _reviewItem(String label, String value) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF16213e),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildReviewStep() {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.check_circle_outline, size: 64, color: theme.colorScheme.primary),
+        const SizedBox(height: 16),
+        Text('Setup Complete!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        const SizedBox(height: 24),
+        _reviewItem('Games', _gamesPath),
+        const SizedBox(height: 8),
+        _reviewItem('Saves', _savesPath),
+        const SizedBox(height: 8),
+        _reviewItem('APIs', '${_getEnabledApisCount()} configured'),
+      ],
     );
   }
 
+  Widget _reviewItem(String label, String value) {
+    final theme = Theme.of(context);
+    return Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(8)), child: Row(children: [Text(label, style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))), const Spacer(), Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500, fontSize: 13))]));
+  }
+
   int _getEnabledApisCount() {
-    int count = 0;
-    if (_steamGridDbController.text.isNotEmpty) count++;
-    if (_igdbClientController.text.isNotEmpty) count++;
-    if (_screenScraperUserController.text.isNotEmpty) count++;
-    return count;
+    int c = 0;
+    if (_steamGridDbController.text.isNotEmpty) c++;
+    if (_igdbClientController.text.isNotEmpty) c++;
+    if (_screenScraperUserController.text.isNotEmpty) c++;
+    return c;
   }
 
   void _nextStep() {
-    if (_currentStep == 3) {
-      _completeSetup();
-      return;
-    }
-
+    if (_currentStep == 3) { _completeSetup(); return; }
     setState(() => _currentStep++);
   }
 
   Future<void> _completeSetup() async {
-    // Save API keys
+    print('[SetupWizard] Completing setup...');
+    print('[SetupWizard] Games: $_gamesPath');
+    print('[SetupWizard] Saves: $_savesPath');
+
     if (_steamGridDbController.text.isNotEmpty) {
-      ref.read(apiConfigProvider.notifier).updateSteamGridDbKey(
-            _steamGridDbController.text,
-          );
+      await ref.read(apiConfigProvider.notifier).updateSteamGridDbKey(_steamGridDbController.text);
     }
-
     if (_igdbClientController.text.isNotEmpty) {
-      ref.read(apiConfigProvider.notifier).updateIgdbCredentials(
-            _igdbClientController.text,
-            _igdbSecretController.text,
-          );
+      await ref.read(apiConfigProvider.notifier).updateIgdbCredentials(_igdbClientController.text, _igdbSecretController.text);
     }
-
     if (_screenScraperUserController.text.isNotEmpty) {
-      ref.read(apiConfigProvider.notifier).updateScreenScraperCredentials(
-            _screenScraperUserController.text,
-            _screenScraperPassController.text,
-          );
+      await ref.read(apiConfigProvider.notifier).updateScreenScraperCredentials(_screenScraperUserController.text, _screenScraperPassController.text);
     }
 
-    // Save settings
-    ref.read(settingsProvider.notifier).updateSettings(
-          ref.read(settingsProvider).copyWith(
-                gamesPath: _gamesPath,
-                savesPath: _savesPath,
-                autoStartEnabled: true,
-                autoScanOnStartup: true,
-              ),
-        );
+    await ref.read(settingsProvider.notifier).updateSettings(
+      ref.read(settingsProvider).copyWith(gamesPath: _gamesPath, savesPath: _savesPath, autoStartEnabled: true, autoScanOnStartup: true),
+    );
 
-    // Generate AutoRun.inf
-    if (_detectedDrive != null) {
-      await _autostartService.generateAutoRunInf(
-        _detectedDrive!,
-        p.join(_detectedDrive!, 'ProjectIndie', 'indie_launcher.exe'),
-      );
-    }
+    final settingsBox = Hive.box('settings');
+    await settingsBox.put('setupDone', true);
+    print('[SetupWizard] setupDone = true');
 
-    // Scan games
+    final exePath = p.join(DriveService.appDir, 'project_indie.exe');
+    await _autostartService.generateAutoRunInf(DriveService.appDir, exePath);
+
     await ref.read(gameLibraryProvider.notifier).rescan();
 
-    // Navigate to library
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/library');
-    }
+    if (mounted) Navigator.of(context).pushReplacementNamed('/library');
   }
 }

@@ -28,7 +28,7 @@ class SteamGridDbApi {
       final data = response.data['data'] as List? ?? [];
       return data.map((item) => ApiSearchResult(
         id: item['id'].toString(),
-        name: item['name'],
+        name: item['name'] as String? ?? '',
         source: 'steamgriddb',
       )).toList();
     } catch (_) {
@@ -51,7 +51,8 @@ class SteamGridDbApi {
 
       final data = response.data['data'] as List? ?? [];
       if (data.isNotEmpty) {
-        return data.first['thumb'];
+        // Prefer full-res 'url', fall back to 'thumb'
+        return (data.first['url'] ?? data.first['thumb']) as String?;
       }
       return null;
     } catch (_) {

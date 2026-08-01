@@ -19,27 +19,40 @@ class ApiConfig {
     this.screenScraperEnabled = false,
   });
 
-  Map<String, dynamic> toJson() => {
-    'steamGridDbKey': steamGridDbKey,
-    'igdbClientId': igdbClientId,
-    'igdbClientSecret': igdbClientSecret,
-    'screenScraperUsername': screenScraperUsername,
-    'screenScraperPassword': screenScraperPassword,
-    'steamGridDbEnabled': steamGridDbEnabled,
-    'igdbEnabled': igdbEnabled,
-    'screenScraperEnabled': screenScraperEnabled,
-  };
+  /// Parse from a map that may have bools stored as strings ("true"/"false")
+  factory ApiConfig.fromMap(Map<String, String> map) {
+    bool parseBool(String? value) {
+      if (value == null) return false;
+      return value.toLowerCase() == 'true';
+    }
 
-  factory ApiConfig.fromJson(Map<String, dynamic> json) => ApiConfig(
-    steamGridDbKey: json['steamGridDbKey'],
-    igdbClientId: json['igdbClientId'],
-    igdbClientSecret: json['igdbClientSecret'],
-    screenScraperUsername: json['screenScraperUsername'],
-    screenScraperPassword: json['screenScraperPassword'],
-    steamGridDbEnabled: json['steamGridDbEnabled'] ?? false,
-    igdbEnabled: json['igdbEnabled'] ?? false,
-    screenScraperEnabled: json['screenScraperEnabled'] ?? false,
-  );
+    return ApiConfig(
+      steamGridDbKey: _nonEmpty(map['steamGridDbKey']),
+      igdbClientId: _nonEmpty(map['igdbClientId']),
+      igdbClientSecret: _nonEmpty(map['igdbClientSecret']),
+      screenScraperUsername: _nonEmpty(map['screenScraperUsername']),
+      screenScraperPassword: _nonEmpty(map['screenScraperPassword']),
+      steamGridDbEnabled: parseBool(map['steamGridDbEnabled']),
+      igdbEnabled: parseBool(map['igdbEnabled']),
+      screenScraperEnabled: parseBool(map['screenScraperEnabled']),
+    );
+  }
+
+  static String? _nonEmpty(String? value) {
+    if (value == null || value.isEmpty || value == 'null') return null;
+    return value;
+  }
+
+  Map<String, String> toMap() => {
+    'steamGridDbKey': steamGridDbKey ?? '',
+    'igdbClientId': igdbClientId ?? '',
+    'igdbClientSecret': igdbClientSecret ?? '',
+    'screenScraperUsername': screenScraperUsername ?? '',
+    'screenScraperPassword': screenScraperPassword ?? '',
+    'steamGridDbEnabled': steamGridDbEnabled.toString(),
+    'igdbEnabled': igdbEnabled.toString(),
+    'screenScraperEnabled': screenScraperEnabled.toString(),
+  };
 
   ApiConfig copyWith({
     String? steamGridDbKey,
@@ -62,6 +75,4 @@ class ApiConfig {
       screenScraperEnabled: screenScraperEnabled ?? this.screenScraperEnabled,
     );
   }
-
-  bool get anyEnabled => steamGridDbEnabled || igdbEnabled || screenScraperEnabled;
 }

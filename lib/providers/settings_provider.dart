@@ -15,8 +15,8 @@ class AppSettings {
   AppSettings({
     this.autoStartEnabled = true,
     this.autoScanOnStartup = true,
-    this.gamesPath = 'H:\\Games',
-    this.savesPath = 'H:\\Saves',
+    required this.gamesPath,
+    required this.savesPath,
   });
 
   Map<String, dynamic> toJson() => {
@@ -29,8 +29,8 @@ class AppSettings {
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
     autoStartEnabled: json['autoStartEnabled'] ?? true,
     autoScanOnStartup: json['autoScanOnStartup'] ?? true,
-    gamesPath: json['gamesPath'] ?? 'H:\\Games',
-    savesPath: json['savesPath'] ?? 'H:\\Saves',
+    gamesPath: json['gamesPath'] ?? '',
+    savesPath: json['savesPath'] ?? '',
   );
 
   AppSettings copyWith({
@@ -51,7 +51,8 @@ class AppSettings {
 class SettingsNotifier extends StateNotifier<AppSettings> {
   late final Box _settingsBox;
 
-  SettingsNotifier() : super(AppSettings()) {
+  SettingsNotifier()
+      : super(AppSettings(gamesPath: '', savesPath: '')) {
     _settingsBox = Hive.box('settings');
     _loadSettings();
   }
@@ -59,12 +60,17 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void _loadSettings() {
     final data = _settingsBox.get('settings');
     if (data != null) {
-      state = AppSettings.fromJson(Map<String, dynamic>.from(data));
+      final map = Map<String, dynamic>.from(data);
+      print('[SettingsNotifier] Loaded: $map');
+      state = AppSettings.fromJson(map);
+    } else {
+      print('[SettingsNotifier] No saved settings');
     }
   }
 
   Future<void> updateSettings(AppSettings newSettings) async {
     state = newSettings;
     await _settingsBox.put('settings', newSettings.toJson());
+    print('[SettingsNotifier] Saved: ${newSettings.toJson()}');
   }
 }

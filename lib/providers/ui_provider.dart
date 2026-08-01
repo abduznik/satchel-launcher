@@ -1,61 +1,16 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input/gamepad_service.dart';
 
-class UiProvider extends ChangeNotifier {
-  InputMode _inputMode = InputMode.mouse;
-  bool _navigationLocked = false;
+// Re-export InputMode so widgets can import from here
+export '../core/input/gamepad_service.dart' show InputMode;
 
-  InputMode get inputMode => _inputMode;
-  bool get navigationLocked => _navigationLocked;
+final inputModeProvider = StateProvider<InputMode>((ref) => InputMode.mouse);
+final navigationLockedProvider = StateProvider<bool>((ref) => false);
 
-  UiProvider() {
-    _listenToInput();
-  }
-
-  void _listenToInput() {
-    gamepadService.actionStream.listen((_) {
-      if (_inputMode != InputMode.gamepad) {
-        _inputMode = InputMode.gamepad;
-        notifyListeners();
-      }
-    });
-  }
-
-  void setMouseMode() {
-    if (_inputMode != InputMode.mouse) {
-      _inputMode = InputMode.mouse;
-      gamepadService.setMouseMode();
-      notifyListeners();
-    }
-  }
-
-  void setKeyboardMode() {
-    if (_inputMode != InputMode.keyboard) {
-      _inputMode = InputMode.keyboard;
-      gamepadService.setKeyboardMode();
-      notifyListeners();
-    }
-  }
-
-  void setGamepadMode() {
-    if (_inputMode != InputMode.gamepad) {
-      _inputMode = InputMode.gamepad;
-      notifyListeners();
-    }
-  }
-
-  void lockNavigation() {
-    _navigationLocked = true;
-    notifyListeners();
-  }
-
-  void unlockNavigation() {
-    _navigationLocked = false;
-    notifyListeners();
-  }
+// Legacy ChangeNotifier shim — kept so LibraryScreen / app.dart don't need rewrites
+class UiProvider {
+  void setMouseMode() {}
+  void setKeyboardMode() {}
 }
 
-final uiProvider = ChangeNotifierProvider<UiProvider>((ref) {
-  return UiProvider();
-});
+final uiProvider = Provider<UiProvider>((ref) => UiProvider());
