@@ -36,13 +36,13 @@ keys.enc
 .env
 .env.*
 
-# Platform-specific
+# Platform-specific (keep windows runner, ignore generated flutter subdir)
 /android/
 /ios/
 /linux/
 /macos/
 /web/
-/windows/
+/windows/flutter/
 
 # Hive
 *.hive
