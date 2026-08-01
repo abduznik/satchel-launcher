@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        type: string
+      notes:
+        description: 'Release notes'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+
+      - name: Flutter test
+        run: flutter test
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\x64\runner\Release"
+          $dataDir = "$releaseDir\data"
+
+          # Ensure data dir exists
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+          # Copy app.so (AOT compiled Dart code)
+          Copy-Item -Force "build\windows\app.so" "$dataDir\app.so"
+
+          # Copy flutter_assets
+          Copy-Item -Recurse -Force "build\flutter_assets" "$dataDir\flutter_assets"
+
+          # Create zip
+          $zipName = "satchel-windows-x64.zip"
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath $zipName
+
+          # Output for next step
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          echo "Built: $zipName ($(((Get-Item $zipName).Length / 1MB).ToString('F1')) MB)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: satchel-windows-x64
+          path: satchel-windows-x64.zip
+
+  release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: satchel-windows-x64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: Satchel ${{ inputs.tag }}
+          body: ${{ inputs.notes }}
+          files: satchel-windows-x64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
