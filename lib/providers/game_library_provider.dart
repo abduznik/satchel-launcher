@@ -116,37 +116,40 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     for (final game in games) {
       if (!mounted) return;
 
-      // Skip if game already has cover AND banner on disk — fully fetched
+      // Check if metadata is COMPLETE (has cover + summary + genres)
       final coverFile = File(p.join(game.folderPath, '.indie', 'cover.jpg'));
       final bannerFile = File(p.join(game.folderPath, '.indie', 'banner.jpg'));
       final hasCover = game.coverPath != null || await coverFile.exists();
+      final hasMetadata = game.metadata?.summary != null && 
+                          game.metadata!.genres.isNotEmpty;
 
-      if (hasCover) {
-        // Wire up path if missing
+      if (hasCover && hasMetadata) {
+        // Fully fetched — just wire up paths if missing
         if (game.coverPath == null && await coverFile.exists()) {
           await updateGame(game.copyWith(coverPath: coverFile.path));
         }
         if (game.bannerPath == null && await bannerFile.exists()) {
           await updateGame(game.copyWith(bannerPath: bannerFile.path));
         }
-        print('[ArtworkFetch] ${game.name} — already has cover, skipping');
+        print('[ArtworkFetch] ${game.name} — fully fetched, skipping');
         continue;
       }
 
-      // No cover — fetch full metadata
-      print('[ArtworkFetch] Fetching full metadata for ${game.name}...');
+      // Incomplete — fetch full metadata
+      print('[ArtworkFetch] Fetching full metadata for ${game.name} (cover=$hasCover, meta=$hasMetadata)...');
       try {
         final candidates = await fetchService.searchCandidates(game.name);
         if (!mounted) return;
 
         if (candidates.isNotEmpty) {
           final best = candidates.first;
-          final data = await fetchService.fetchFull(game, best);
+          // Clear old assets if cover exists but metadata is incomplete
+          final data = await fetchService.fetchFull(game, best, clearOld: hasCover && !hasMetadata);
           if (!mounted) return;
 
           final updated = game.copyWith(
-            coverPath: data.coverPath,
-            bannerPath: data.bannerPath,
+            coverPath: data.coverPath ?? game.coverPath,
+            bannerPath: data.bannerPath ?? game.bannerPath,
             metadata: data.metadata,
           );
           await updateGame(updated);

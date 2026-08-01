@@ -45,6 +45,7 @@ class GameGrid extends ConsumerWidget {
           itemBuilder: (context, index) {
             final game = games[index];
             return FocusEffectWrapper(
+              key: ValueKey('${game.id}_${game.lastPlayed.millisecondsSinceEpoch}'),
               onTap: () => _openGameDetail(context, game),
               onLongPress: () => _openMetadataPicker(context, game),
               child: GameCard(game: game),
