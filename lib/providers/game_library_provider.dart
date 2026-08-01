@@ -116,22 +116,22 @@ class GameLibraryNotifier extends StateNotifier<AsyncValue<List<Game>>> {
     for (final game in games) {
       if (!mounted) return;
 
-      // Check if metadata is COMPLETE (has cover + summary + genres)
+      // Check if metadata is COMPLETE
       final coverFile = File(p.join(game.folderPath, '.indie', 'cover.jpg'));
       final bannerFile = File(p.join(game.folderPath, '.indie', 'banner.jpg'));
       final hasCover = game.coverPath != null || await coverFile.exists();
       final hasMetadata = game.metadata?.summary != null && 
                           game.metadata!.genres.isNotEmpty;
 
-      if (hasCover && hasMetadata) {
-        // Fully fetched — just wire up paths if missing
-        if (game.coverPath == null && await coverFile.exists()) {
+      if (hasMetadata) {
+        // Metadata is complete — just wire up paths if missing
+        if (!hasCover && await coverFile.exists()) {
           await updateGame(game.copyWith(coverPath: coverFile.path));
         }
         if (game.bannerPath == null && await bannerFile.exists()) {
           await updateGame(game.copyWith(bannerPath: bannerFile.path));
         }
-        print('[ArtworkFetch] ${game.name} — fully fetched, skipping');
+        print('[ArtworkFetch] ${game.name} — metadata complete, skipping');
         continue;
       }
 

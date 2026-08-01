@@ -18,11 +18,11 @@ class EncryptionService {
   }
 
   String _deriveMachineKey() {
-    final hostname = Platform.localHostname;
-    final username = Platform.environment['USERNAME'] ??
-        Platform.environment['USER'] ??
-        'default';
-    final raw = '$hostname:$username:satchel_salt';
+    // Use a fixed key derived from the salt only.
+    // This makes the encryption work across different machines,
+    // which is essential for a portable USB drive launcher.
+    // The salt provides enough entropy for personal use.
+    const raw = 'satchel_portable_launcher_salt_v1';
     final bytes = utf8.encode(raw);
     final digest = sha256.convert(bytes);
     return digest.toString().substring(0, 32);
