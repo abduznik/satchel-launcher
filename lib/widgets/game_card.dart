@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game.dart';
+import '../providers/playing_game_provider.dart';
 
-class GameCard extends StatefulWidget {
+class GameCard extends ConsumerStatefulWidget {
   final Game game;
   final VoidCallback? onTap;
 
@@ -13,10 +15,10 @@ class GameCard extends StatefulWidget {
   });
 
   @override
-  State<GameCard> createState() => _GameCardState();
+  ConsumerState<GameCard> createState() => _GameCardState();
 }
 
-class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin {
+class _GameCardState extends ConsumerState<GameCard> with SingleTickerProviderStateMixin {
   bool _hovered = false;
   late final AnimationController _controller;
   late final Animation<double> _scaleAnim;
@@ -63,12 +65,16 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
     final hasCover = widget.game.coverPath != null &&
         File(widget.game.coverPath!).existsSync();
 
+    // Check if this game is currently playing
+    final playing = ref.watch(playingGameProvider);
+    final isThisGamePlaying = playing != null && playing.game.id == widget.game.id;
+
     return MouseRegion(
       onEnter: (_) => _onEnter(),
       onExit: (_) => _onExit(),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: isThisGamePlaying ? null : widget.onTap,
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) => Transform.scale(
@@ -82,11 +88,17 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
-                  if (_hovered)
+                  if (_hovered && !isThisGamePlaying)
                     BoxShadow(
                       color: accent.withValues(alpha: 0.28 * _glowAnim.value),
                       blurRadius: 24,
                       spreadRadius: 1,
+                    ),
+                  if (isThisGamePlaying)
+                    BoxShadow(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      spreadRadius: 2,
                     ),
                 ],
               ),
@@ -98,7 +110,7 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // ── Background: cover image via DecorationImage ──────────
+                // ── Background: cover image ──────────
                 hasCover
                     ? Container(
                         decoration: BoxDecoration(
@@ -111,7 +123,7 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
                       )
                     : _Placeholder(name: widget.game.name),
 
-                // ── Bottom gradient (always) ─────────────────────────────
+                // ── Bottom gradient (always) ─────────
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -123,46 +135,102 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
                   ),
                 ),
 
-                // ── Hover: deeper overlay ────────────────────────────────
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 180),
-                  opacity: _hovered ? 1.0 : 0.0,
-                  child: const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: [0.55, 1.0],
-                        colors: [Colors.transparent, Color(0xDD000000)],
+                // ── Hover overlay ────────────────────
+                if (!isThisGamePlaying)
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    opacity: _hovered ? 1.0 : 0.0,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: [0.55, 1.0],
+                          colors: [Colors.transparent, Color(0xDD000000)],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // ── Hover: accent top line ───────────────────────────────
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 180),
-                  opacity: _hovered ? 1.0 : 0.0,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Builder(
-                      builder: (ctx) => Container(
-                        height: 2,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              Theme.of(ctx).colorScheme.primary,
-                              Colors.transparent,
-                            ],
+                // ── "Now Playing" green overlay ──────
+                if (isThisGamePlaying)
+                  Container(
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                  ),
+
+                // ── Hover: accent top line ───────────
+                if (!isThisGamePlaying)
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    opacity: _hovered ? 1.0 : 0.0,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Builder(
+                        builder: (ctx) => Container(
+                          height: 2,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                Theme.of(ctx).colorScheme.primary,
+                                Colors.transparent,
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
-                // ── Game name + genre ────────────────────────────────────
+                // ── "Now Playing" indicator (top) ────
+                if (isThisGamePlaying)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    right: 8,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.play_arrow_rounded, color: Colors.white, size: 12),
+                              SizedBox(width: 3),
+                              Text(
+                                'NOW PLAYING',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        // Stop button
+                        GestureDetector(
+                          onTap: () => stopCurrentGame(ref),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.stop_rounded, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // ── Game name + genre ────────────────
                 Positioned(
                   bottom: 0,
                   left: 0,
@@ -175,12 +243,14 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
                       children: [
                         Text(
                           widget.game.name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isThisGamePlaying
+                                ? const Color(0xFF22C55E)
+                                : Colors.white,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             letterSpacing: 0.1,
-                            shadows: [Shadow(color: Colors.black, blurRadius: 10)],
+                            shadows: const [Shadow(color: Colors.black, blurRadius: 10)],
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -203,8 +273,8 @@ class _GameCardState extends State<GameCard> with SingleTickerProviderStateMixin
                   ),
                 ),
 
-                // ── Recently played green dot ────────────────────────────
-                if (recentlyPlayed)
+                // ── Recently played green dot ────────
+                if (recentlyPlayed && !isThisGamePlaying)
                   Positioned(
                     top: 8,
                     left: 8,

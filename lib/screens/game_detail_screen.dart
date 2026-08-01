@@ -8,13 +8,14 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../providers/api_provider.dart';
 import '../providers/game_library_provider.dart';
+import '../providers/playing_game_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 
 import '../services/omnisave_service.dart';
 import '../services/pcgamingwiki_service.dart';
 import '../services/platform_service.dart';
-import '../services/windows_launch_service.dart';
+import '../services/game_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/focus_effect_wrapper.dart';
 import '../widgets/metadata_editor_dialog.dart';
@@ -34,6 +35,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
   late FocusNode _focusNode;
   final PcgamingwikiService _pcgamingwiki = PcgamingwikiService();
   bool _isLaunching = false;
+  String _launchStatus = '';
+  GameLaunchService? _launchService;
 
   @override
   void initState() {
@@ -258,84 +261,97 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // ── Launch Button ───────────────────────────────
-                          FocusEffectWrapper(
-                            onTap: _isLaunching ? null : _launchGame,
-                            child: AnimatedOpacity(
-                              duration: const Duration(milliseconds: 200),
-                              opacity: _isLaunching ? 0.65 : 1.0,
-                              child: Container(
-                                width: double.infinity,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      cs.primary,
-                                      Color.lerp(cs.primary, cs.secondary, 0.5) ??
-                                          cs.primary,
-                                    ],
+                          // Check if this game is playing
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final playing = ref.watch(playingGameProvider);
+                              final isThisGamePlaying = playing != null && playing.game.id == widget.game.id;
+
+                              return FocusEffectWrapper(
+                                onTap: isThisGamePlaying
+                                    ? () => stopCurrentGame(ref)
+                                    : (_isLaunching ? null : _launchGame),
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: _isLaunching ? 0.65 : 1.0,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: isThisGamePlaying
+                                            ? [const Color(0xFFDC2626), const Color(0xFFEF4444)]
+                                            : [
+                                                cs.primary,
+                                                Color.lerp(cs.primary, cs.secondary, 0.5) ?? cs.primary,
+                                              ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: _isLaunching
+                                          ? []
+                                          : [
+                                              BoxShadow(
+                                                color: (isThisGamePlaying
+                                                        ? const Color(0xFFDC2626)
+                                                        : cs.primary)
+                                                    .withValues(alpha: 0.38),
+                                                blurRadius: 16,
+                                                offset: const Offset(0, 5),
+                                              ),
+                                            ],
+                                    ),
+                                    child: Center(
+                                      child: _isLaunching
+                                          ? Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  _launchStatus.isNotEmpty ? _launchStatus.toUpperCase() : 'LAUNCHING...',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 2,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  isThisGamePlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                                                  size: 30,
+                                                  color: Colors.white,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  isThisGamePlaying ? 'STOP' : 'PLAY',
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 3,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: _isLaunching
-                                      ? []
-                                      : [
-                                          BoxShadow(
-                                            color: cs.primary.withValues(alpha: 0.38),
-                                            blurRadius: 16,
-                                            offset: const Offset(0, 5),
-                                          ),
-                                        ],
                                 ),
-                                child: Center(
-                                  child: _isLaunching
-                                      ? const Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<Color>(
-                                                        Colors.white),
-                                              ),
-                                            ),
-                                            SizedBox(width: 12),
-                                            Text(
-                                              'LAUNCHING...',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 2,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        )
-                                      : const Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.play_arrow_rounded,
-                                                size: 30, color: Colors.white),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'PLAY',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 3,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
 
                           const SizedBox(height: 10),
@@ -700,8 +716,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
 
   Future<void> _launchGame() async {
     if (_isLaunching) return;
-    setState(() => _isLaunching = true);
-    print('[Launch] Launching ${widget.game.name} → ${widget.game.exePath}');
+    setState(() {
+      _isLaunching = true;
+      _launchStatus = 'Preparing...';
+    });
 
     // First-launch: show setup dialog if omnisave hasn't been configured yet
     final metaFile = File(p.join(widget.game.folderPath, '.indie', 'meta.json'));
@@ -714,53 +732,36 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
     }
 
     if (!omnisaveConfigured) {
-      print('[Launch] First launch detected for ${widget.game.name} — OmniSave not configured');
       if (mounted) await _showFirstLaunchDialog();
-      // If user cancelled (isLaunching was reset), abort
       if (!mounted || !_isLaunching) return;
-    } else {
-      print('[Launch] OmniSave already configured for ${widget.game.name}');
     }
 
     if (!mounted) return;
 
-    // Launch via OmniSave if configured, fall back to direct launch.
-    // Read the existing Local_Path from .indie/omnisave.ini so launchGame
-    // doesn't clobber it with the default Documents\Saves path.
-    final iniFile = File(p.join(widget.game.folderPath, '.indie', 'omnisave.ini'));
-    bool launchedViaOmniSave = false;
-    if (await iniFile.exists()) {
-      String? existingLocalPath;
-      try {
-        for (final line in await iniFile.readAsLines()) {
-          if (line.startsWith('Local_Path=')) {
-            existingLocalPath = line.substring('Local_Path='.length).trim();
-            break;
-          }
+    // Use the launch service for full lifecycle management
+    _launchService = GameLaunchService();
+    await _launchService!.launch(
+      widget.game,
+      ref,
+      onStatusChanged: (status, message) {
+        if (mounted) {
+          setState(() {
+            _launchStatus = message;
+            if (status == LaunchStatus.done || status == LaunchStatus.error) {
+              _isLaunching = false;
+              _launchStatus = '';
+            }
+          });
         }
-      } catch (_) {}
-      final settings = ref.read(settingsProvider);
-      final omniSave = OmniSaveService(savesBasePath: settings.savesPath);
-      launchedViaOmniSave = await omniSave.launchGame(
-        widget.game,
-        localSavePath: existingLocalPath,
-      );
-    }
-    if (!launchedViaOmniSave) {
-      print('[Launch] Launching directly for ${widget.game.name}');
-      await WindowsLaunchService.launch(widget.game.exePath);
-    }
-    print('[Launch] Process started for ${widget.game.name}');
+      },
+    );
 
-    // Update last played
-    ref.read(gameLibraryProvider.notifier).updateGame(
-          widget.game.copyWith(lastPlayed: DateTime.now()),
-        );
-
-    // Show brief "launching" overlay then reset
+    // Ensure state is reset
     if (mounted) {
-      await Future.delayed(const Duration(seconds: 3));
-      if (mounted) setState(() => _isLaunching = false);
+      setState(() {
+        _isLaunching = false;
+        _launchStatus = '';
+      });
     }
   }
 

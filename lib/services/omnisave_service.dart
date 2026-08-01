@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import 'drive_service.dart';
+import 'process_tracker.dart';
 
 class OmniSaveService {
   final String savesBasePath;
@@ -75,9 +77,9 @@ class OmniSaveService {
   }
 
   /// Launches the game via OmniSave if the exe is available.
-  /// Returns true if launched via OmniSave, false if OmniSave.exe was not found
-  /// (caller should fall back to direct launch).
-  Future<bool> launchGame(
+  /// Returns the OmniSave Process handle for tracking, or null if
+  /// OmniSave.exe was not found (caller should fall back to direct launch).
+  Future<Process?> launchGame(
     Game game, {
     String? localSavePath,
     String? gameArgs,
@@ -88,17 +90,35 @@ class OmniSaveService {
     final omniSavePath = await _extractOmniSave(game.folderPath);
     if (omniSavePath == null) {
       print('[OmniSave] OmniSave.exe unavailable — falling back to direct launch');
-      return false;
+      return null;
     }
 
     print('[OmniSave] Launching via OmniSave: $omniSavePath');
-    await Process.start(
-      omniSavePath,
-      [],
-      workingDirectory: game.folderPath,
-      mode: ProcessStartMode.detached,
-    );
-    return true;
+    try {
+      final process = await Process.start(
+        omniSavePath,
+        [],
+        workingDirectory: game.folderPath,
+        mode: ProcessStartMode.detached,
+      );
+      return process;
+    } catch (e) {
+      print('[OmniSave] Failed to launch: $e');
+      return null;
+    }
+  }
+
+  /// Waits for OmniSave to finish its work (sync saves, launch game, cleanup).
+  /// OmniSave syncs saves to the drive, launches the game, then exits.
+  /// We wait for the OmniSave process to exit to ensure saves are synced.
+  static Future<void> waitForSync(ProcessTracker tracker, {Duration timeout = const Duration(seconds: 30)}) async {
+    print('[OmniSave] Waiting for OmniSave to finish...');
+    try {
+      await tracker.whenExited.timeout(timeout);
+      print('[OmniSave] OmniSave finished');
+    } on TimeoutException {
+      print('[OmniSave] Timeout waiting for OmniSave — proceeding anyway');
+    }
   }
 
   Future<void> cleanupAfterLaunch(Game game) async {

@@ -8,12 +8,10 @@ import 'package:path/path.dart' as p;
 import '../models/game.dart';
 import '../providers/game_library_provider.dart';
 import '../providers/search_provider.dart';
-import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/ui_provider.dart';
-import '../services/omnisave_service.dart';
 import '../services/platform_service.dart';
-import '../services/windows_launch_service.dart';
+import '../services/game_launch_service.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/game_grid.dart';
 import '../widgets/focus_effect_wrapper.dart';
@@ -767,10 +765,15 @@ class _GameDetailPanel extends ConsumerStatefulWidget {
 
 class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
   bool _isLaunching = false;
+  String _launchStatus = '';
+  GameLaunchService? _launchService;
 
   Future<void> _launchGame(Game game) async {
     if (_isLaunching) return;
-    setState(() => _isLaunching = true);
+    setState(() {
+      _isLaunching = true;
+      _launchStatus = 'Preparing...';
+    });
 
     // Check if omnisave is configured — if not, open game detail so user can set it up
     final metaFile = File(p.join(game.folderPath, '.indie', 'meta.json'));
@@ -793,35 +796,30 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
       return;
     }
 
-    // Read existing Local_Path from ini so we don't clobber it
-    final iniFile = File(p.join(game.folderPath, '.indie', 'omnisave.ini'));
-    bool launchedViaOmniSave = false;
-    if (await iniFile.exists()) {
-      String? existingLocalPath;
-      try {
-        for (final line in await iniFile.readAsLines()) {
-          if (line.startsWith('Local_Path=')) {
-            existingLocalPath = line.substring('Local_Path='.length).trim();
-            break;
-          }
+    // Use the launch service for full lifecycle management
+    _launchService = GameLaunchService();
+    await _launchService!.launch(
+      game,
+      ref,
+      onStatusChanged: (status, message) {
+        if (mounted) {
+          setState(() {
+            _launchStatus = message;
+            if (status == LaunchStatus.done || status == LaunchStatus.error) {
+              _isLaunching = false;
+              _launchStatus = '';
+            }
+          });
         }
-      } catch (_) {}
-      final settings = ref.read(settingsProvider);
-      final omniSave = OmniSaveService(savesBasePath: settings.savesPath);
-      launchedViaOmniSave = await omniSave.launchGame(game, localSavePath: existingLocalPath);
-    }
-    if (!launchedViaOmniSave) {
-      await WindowsLaunchService.launch(game.exePath);
-    }
+      },
+    );
 
-    // Update last played
-    ref.read(gameLibraryProvider.notifier).updateGame(
-          game.copyWith(lastPlayed: DateTime.now()),
-        );
-
+    // If launch completed (OmniSave path), ensure state is reset
     if (mounted) {
-      await Future.delayed(const Duration(seconds: 3));
-      if (mounted) setState(() => _isLaunching = false);
+      setState(() {
+        _isLaunching = false;
+        _launchStatus = '';
+      });
     }
   }
 
@@ -1039,7 +1037,9 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                             )
                           : const Icon(Icons.play_arrow_rounded, size: 26),
                       label: Text(
-                        _isLaunching ? 'LAUNCHING...' : 'PLAY',
+                        _isLaunching
+                            ? (_launchStatus.isNotEmpty ? _launchStatus.toUpperCase() : 'LAUNCHING...')
+                            : 'PLAY',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
