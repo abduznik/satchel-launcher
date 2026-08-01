@@ -716,6 +716,33 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
 
   Future<void> _launchGame() async {
     if (_isLaunching) return;
+
+    // Guard: check if another game is already running
+    final currentPlaying = ref.read(playingGameProvider);
+    if (currentPlaying != null && currentPlaying.game.id != widget.game.id) {
+      final shouldStop = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('${currentPlaying.game.name} is running'),
+          content: Text('Stop ${currentPlaying.game.name} and launch ${widget.game.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Stop & Launch'),
+            ),
+          ],
+        ),
+      );
+      if (shouldStop != true) return;
+      await stopCurrentGame(ref);
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
     setState(() {
       _isLaunching = true;
       _launchStatus = 'Preparing...';

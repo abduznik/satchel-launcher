@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-/// Tracks a running game process and detects when it exits.
+/// Tracks a running process by PID, with polling fallback for Wine/Crossover.
 class ProcessTracker {
-  Process? _process;
+  int? _pid;
+  String? _processName;
   Timer? _pollTimer;
   final Completer<void> _exitCompleter = Completer<void>();
   bool _exited = false;
@@ -11,70 +12,98 @@ class ProcessTracker {
 
   ProcessTracker({this.onExit});
 
-  /// Attaches to an already-started process for tracking.
+  /// Attaches to an already-started process.
   void attach(Process process) {
-    _process = process;
+    _pid = process.pid;
     _startTracking();
   }
 
-  /// Starts tracking via exit code future (works on native Windows).
-  /// Also polls periodically as a fallback (works under Wine/Crossover
-  /// where the exit code future may not fire reliably).
+  /// Attaches by PID and process name (for tracking game.exe after OmniSave launches it).
+  void attachByName(int pid, String name) {
+    _pid = pid;
+    _processName = name;
+    _startTracking();
+  }
+
   void _startTracking() {
-    if (_process == null) return;
+    // Listen to exit code (works on native Windows)
+    if (_pid != null) {
+      // We can't listen to exitCode of a process we didn't start,
+      // so rely on polling.
+    }
 
-    // Method 1: Listen to exit code (native Windows, reliable)
-    _process!.exitCode.then((_) {
-      if (!_exited) _markExited();
-    }).catchError((_) {
-      // Ignore — fallback polling will catch it
-    });
-
-    // Method 2: Poll process every 2 seconds (Wine/Crossover fallback)
+    // Poll every 2 seconds
     _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (_exited) return;
-      _checkIfAlive();
+      if (!_exited) _checkIfAlive();
     });
   }
 
-  /// Checks if the process is still alive by polling.
-  /// Under Wine, we check if the PID is still running.
   void _checkIfAlive() {
-    if (_process == null || _exited) return;
+    if (_exited || _pid == null) return;
 
     try {
-      // On Windows/Wine: try to find the process by PID.
-      // If the process is gone, this will throw or return empty.
-      final pid = _process!.pid;
-
-      // Use tasklist on Windows, ps on Unix — but under Wine we're
-      // still in Windows mode so tasklist works.
       if (Platform.isWindows) {
-        Process.run('tasklist', ['/FI', 'PID eq $pid', '/NH']).then((result) {
-          if (!_exited) {
-            // If tasklist doesn't find the PID, the process is gone
-            final output = result.stdout.toString();
-            if (!output.contains('$pid') || output.contains('INFO:')) {
+        // Check by PID first
+        Process.run('tasklist', ['/FI', 'PID eq $_pid', '/NH']).then((result) {
+          if (_exited) return;
+          final output = result.stdout.toString();
+          final found = output.contains('$_pid') && !output.contains('INFO:');
+          if (!found) {
+            // PID gone — but maybe the game restarted with a new PID.
+            // If we have a process name, search for it.
+            if (_processName != null) {
+              _searchByName(_processName!);
+            } else {
               _markExited();
             }
           }
         }).catchError((_) {
-          // If tasklist fails, assume process is gone after a grace period
+          if (!_exited) _markExited();
         });
       } else {
-        // On native macOS/Linux (unlikely for this launcher, but just in case)
-        Process.run('kill', ['-0', '$pid']).then((result) {
-          // kill -0 succeeds if process exists
+        Process.run('kill', ['-0', '$_pid']).then((result) {
           if (result.exitCode != 0 && !_exited) {
-            _markExited();
+            if (_processName != null) {
+              _searchByName(_processName!);
+            } else {
+              _markExited();
+            }
           }
         }).catchError((_) {
           if (!_exited) _markExited();
         });
       }
     } catch (_) {
-      // Process access error — likely means it's gone
       if (!_exited) _markExited();
+    }
+  }
+
+  /// Searches for a process by name (e.g. "game.exe") and updates the tracked PID.
+  void _searchByName(String name) async {
+    try {
+      final result = await Process.run('tasklist', ['/FI', 'IMAGENAME eq $name', '/NH']);
+      final output = result.stdout.toString();
+      if (output.contains(name) && !output.contains('INFO:')) {
+        // Found it — extract the new PID
+        final lines = output.split('\n');
+        for (final line in lines) {
+          if (line.toLowerCase().contains(name.toLowerCase())) {
+            final parts = line.trim().split(RegExp(r'\s+'));
+            if (parts.length >= 2) {
+              final newPid = int.tryParse(parts[1]);
+              if (newPid != null && newPid != _pid) {
+                print('[ProcessTracker] Found $name with new PID: $newPid (was $_pid)');
+                _pid = newPid;
+                return; // Still alive with new PID
+              }
+            }
+          }
+        }
+      }
+      // Not found by name either — game truly exited
+      if (!_exited) _markExited();
+    } catch (_) {
+      // Can't search — assume still alive to avoid false positives
     }
   }
 
@@ -82,21 +111,19 @@ class ProcessTracker {
     if (_exited) return;
     _exited = true;
     _pollTimer?.cancel();
-    print('[ProcessTracker] Process exited (PID: ${_process?.pid})');
+    print('[ProcessTracker] Process exited (PID: $_pid, name: $_processName)');
     onExit?.call();
     if (!_exitCompleter.isCompleted) _exitCompleter.complete();
   }
 
-  /// Whether the process has exited.
   bool get hasExited => _exited;
+  int? get pid => _pid;
+  String? get processName => _processName;
 
-  /// Future that completes when the process exits.
   Future<void> get whenExited => _exitCompleter.future;
 
-  /// Manually mark as exited (e.g. if we can't track it).
   void markExited() => _markExited();
 
-  /// Cleanup.
   void dispose() {
     _pollTimer?.cancel();
   }

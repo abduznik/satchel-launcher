@@ -2,61 +2,57 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game.dart';
 
-/// Tracks the currently running game and its process.
-/// Any widget in the app can read this to show "Now Playing" state.
+/// Tracks the currently running game.
 class PlayingGame {
   final Game game;
-  final Process process;
+  final int pid;
+  final String processName; // e.g. "game.exe" or "OmniSave.exe"
   final DateTime startedAt;
 
   PlayingGame({
     required this.game,
-    required this.process,
+    required this.pid,
+    required this.processName,
     DateTime? startedAt,
   }) : startedAt = startedAt ?? DateTime.now();
 }
 
 /// Global state for the currently playing game.
-/// Null when no game is running.
 final playingGameProvider = StateProvider<PlayingGame?>((ref) => null);
 
-/// Whether a specific game is currently running.
-bool isGamePlaying(WidgetRef ref, String gameId) {
-  final playing = ref.read(playingGameProvider);
-  return playing != null && playing.game.id == gameId;
-}
-
-/// Whether any game is running.
 bool isAnyGamePlaying(WidgetRef ref) {
   return ref.read(playingGameProvider) != null;
 }
 
-/// Gracefully stops the currently running game.
-/// Kills the process tree to ensure the game and all child processes are terminated.
+/// Stops the currently running game by killing the process tree.
 Future<void> stopCurrentGame(WidgetRef ref) async {
   final playing = ref.read(playingGameProvider);
   if (playing == null) return;
 
-  final pid = playing.process.pid;
-  print('[PlayingGame] Stopping game: ${playing.game.name} (PID: $pid)');
+  final pid = playing.pid;
+  final name = playing.processName;
+  print('[PlayingGame] Stopping: ${playing.game.name} (PID: $pid, name: $name)');
 
   try {
     if (Platform.isWindows) {
-      // taskkill /T kills the process tree (all child processes)
+      // Kill by PID
       await Process.run('taskkill', ['/F', '/T', '/PID', '$pid']);
+      // Also kill by name in case PID changed
+      await Process.run('taskkill', ['/F', '/IM', name]);
     } else {
-      // On macOS/Linux (Wine): kill the process group
       await Process.run('kill', ['-TERM', '$pid']);
-      // Give it a moment to exit gracefully
       await Future.delayed(const Duration(seconds: 2));
-      // Force kill if still running
       try {
         await Process.run('kill', ['-9', '$pid']);
       } catch (_) {}
+      // Also kill by name
+      try {
+        await Process.run('pkill', ['-f', name]);
+      } catch (_) {}
     }
-    print('[PlayingGame] Game stopped');
+    print('[PlayingGame] Stopped');
   } catch (e) {
-    print('[PlayingGame] Error stopping game: $e');
+    print('[PlayingGame] Error stopping: $e');
   }
 
   ref.read(playingGameProvider.notifier).state = null;
