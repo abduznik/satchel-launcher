@@ -9,7 +9,7 @@ import 'api_provider.dart';
 
 final gameScannerProvider = Provider<GameScanner>((ref) {
   final settings = ref.watch(settingsProvider);
-  final path = settings.gamesPath;
+  final path = settings.resolvedGamesPath;
   print('[gameScannerProvider] Scanner path from settings: $path');
   return GameScanner(gamesPath: path);
 });

@@ -109,7 +109,7 @@ class GameLaunchService {
       }
 
       final settings = ref.read(settingsProvider);
-      final omniSave = OmniSaveService(savesBasePath: settings.savesPath);
+      final omniSave = OmniSaveService(savesBasePath: settings.resolvedSavesPath);
 
       // Try OmniSave first
       final omniSaveProcess = await omniSave.launchGame(

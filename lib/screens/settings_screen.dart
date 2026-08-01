@@ -104,13 +104,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _PathRow(
                             label: 'Games folder',
                             description: 'Where your game folders are stored',
-                            path: settings.gamesPath,
+                            path: settings.resolvedGamesPath,
                             onBrowse: () => _pickDirectory('Games'),
                           ),
                           _PathRow(
                             label: 'Saves folder',
                             description: 'Root folder for OmniSave backups',
-                            path: settings.savesPath,
+                            path: settings.resolvedSavesPath,
                             onBrowse: () => _pickDirectory('Saves'),
                           ),
                           _InfoRow(label: 'Config', value: DriveService.configPath),

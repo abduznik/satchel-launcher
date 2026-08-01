@@ -159,7 +159,7 @@ class _SaveLocationDialogState extends ConsumerState<SaveLocationDialog> {
           : _toPortable(_displayController.text.trim());
       if (pathToWrite.isNotEmpty) {
         final settings = ref.read(settingsProvider);
-        final omniSave = OmniSaveService(savesBasePath: settings.savesPath);
+        final omniSave = OmniSaveService(savesBasePath: settings.resolvedSavesPath);
         await omniSave.generateConfig(widget.game, localSavePath: pathToWrite);
       }
       await _saveMetaJson({'omnisaveConfigured': true, 'skipSaveSync': false});

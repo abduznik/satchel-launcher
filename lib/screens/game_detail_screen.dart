@@ -1154,7 +1154,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                       if (pathToWrite.isNotEmpty) {
                         final settings = ref.read(settingsProvider);
                         final omniSave =
-                            OmniSaveService(savesBasePath: settings.savesPath);
+                            OmniSaveService(savesBasePath: settings.resolvedSavesPath);
                         await omniSave.generateConfig(
                           widget.game,
                           localSavePath: pathToWrite,
