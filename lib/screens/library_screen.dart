@@ -10,9 +10,11 @@ import '../providers/game_library_provider.dart';
 import '../providers/playing_game_provider.dart';
 import '../providers/search_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/ui_provider.dart';
 import '../services/platform_service.dart';
 import '../services/game_launch_service.dart';
+import '../services/omnisave_service.dart';
 import '../widgets/activity_panel.dart';
 import '../widgets/art_picker_dialog.dart';
 import '../widgets/game_grid.dart';
@@ -801,6 +803,28 @@ class _GameDetailPanel extends ConsumerStatefulWidget {
 class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
   bool _isLaunching = false;
   String _launchStatus = '';
+  bool _isPushingSave = false;
+
+  Future<void> _forcePushSave(Game game) async {
+    setState(() => _isPushingSave = true);
+    final settings = ref.read(settingsProvider);
+    final omniSave = OmniSaveService(savesBasePath: settings.resolvedSavesPath);
+    bool success = false;
+    try {
+      success = await omniSave.forcePushSave(game);
+    } catch (e) {
+      print('[LibraryScreen] Force save push failed: $e');
+    }
+    if (!mounted) return;
+    setState(() => _isPushingSave = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Save pushed to drive.'
+            : 'Could not push save — configure a save location first.'),
+      ),
+    );
+  }
 
   Future<void> _launchGame(Game game) async {
     if (_isLaunching) return;
@@ -1208,6 +1232,37 @@ class _GameDetailPanelState extends ConsumerState<_GameDetailPanel> {
                       icon: const Icon(Icons.edit_note_rounded, size: 15),
                       label: const Text('Edit Metadata',
                           style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Force save push button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isPushingSave
+                          ? null
+                          : () => _forcePushSave(liveGame),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: cs.onSurface.withValues(alpha: 0.7),
+                        side: BorderSide(
+                            color: cs.outline.withValues(alpha: 0.2)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: _isPushingSave
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_upload_rounded, size: 15),
+                      label: Text(
+                          _isPushingSave ? 'Pushing...' : 'Force Save Push',
+                          style: const TextStyle(fontSize: 12)),
                     ),
                   ),
 

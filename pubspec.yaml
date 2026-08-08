@@ -1,7 +1,7 @@
 name: satchel
 description: A portable, offline-first DRM-free game launcher that lives on a USB drive. Browse, search, and launch your Windows games from any PC with full metadata, artwork, and save synchronization.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.1.0 <4.0.0'

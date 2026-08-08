@@ -128,6 +128,54 @@ class OmniSaveService {
     }
   }
 
+  /// Force-pushes the local save folder to the remote (drive) save folder,
+  /// bypassing OmniSave.exe entirely. Useful for games whose saves aren't
+  /// reliably synced on exit (e.g. games that don't terminate cleanly).
+  /// Reads Local_Path/Remote_Path from the game's omnisave.ini.
+  /// Returns true on success, false if no save config / local folder found.
+  Future<bool> forcePushSave(Game game) async {
+    final iniFile = File(p.join(game.folderPath, '.indie', 'omnisave.ini'));
+    if (!await iniFile.exists()) return false;
+
+    String? localPath;
+    String? remotePath;
+    for (final line in await iniFile.readAsLines()) {
+      if (line.startsWith('Local_Path=')) {
+        localPath = line.substring('Local_Path='.length).trim();
+      } else if (line.startsWith('Remote_Path=')) {
+        remotePath = line.substring('Remote_Path='.length).trim();
+      }
+    }
+    if (localPath == null || localPath.isEmpty) return false;
+    if (remotePath == null || remotePath.isEmpty) return false;
+
+    final resolvedLocal = DriveService.resolvePortable(localPath);
+    final localDir = Directory(resolvedLocal);
+    if (!await localDir.exists()) return false;
+
+    final remoteDir = Directory(remotePath);
+    if (!await remoteDir.exists()) {
+      await remoteDir.create(recursive: true);
+    }
+
+    await _copyDirectory(localDir, remoteDir);
+    return true;
+  }
+
+  Future<void> _copyDirectory(Directory source, Directory destination) async {
+    await for (final entity in source.list(recursive: false)) {
+      final name = p.basename(entity.path);
+      final destPath = p.join(destination.path, name);
+      if (entity is Directory) {
+        final newDir = Directory(destPath);
+        await newDir.create(recursive: true);
+        await _copyDirectory(entity, newDir);
+      } else if (entity is File) {
+        await entity.copy(destPath);
+      }
+    }
+  }
+
   Future<void> cleanupAfterLaunch(Game game) async {
     // Remove OmniSave.exe and OmniSave.ini from the game folder after use.
     // Never throws — cleanup must not block the "back to PLAY" state reset.

@@ -36,6 +36,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
   final PcgamingwikiService _pcgamingwiki = PcgamingwikiService();
   bool _isLaunching = false;
   String _launchStatus = '';
+  bool _isPushingSave = false;
 
   @override
   void initState() {
@@ -401,6 +402,26 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
                                 ),
                                 icon: const Icon(Icons.edit_note_rounded, size: 15),
                                 label: const Text('Edit Metadata'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _isPushingSave ? null : _forcePushSave,
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                      color: cs.outline.withValues(alpha: 0.25)),
+                                  foregroundColor:
+                                      cs.onSurface.withValues(alpha: 0.65),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                icon: _isPushingSave
+                                    ? const SizedBox(
+                                        width: 15,
+                                        height: 15,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.cloud_upload_rounded, size: 15),
+                                label: Text(_isPushingSave ? 'Pushing...' : 'Force Save Push'),
                               ),
                             ],
                           ),
@@ -789,6 +810,27 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen> {
         _launchStatus = '';
       });
     }
+  }
+
+  Future<void> _forcePushSave() async {
+    setState(() => _isPushingSave = true);
+    final settings = ref.read(settingsProvider);
+    final omniSave = OmniSaveService(savesBasePath: settings.resolvedSavesPath);
+    bool success = false;
+    try {
+      success = await omniSave.forcePushSave(widget.game);
+    } catch (e) {
+      print('[GameDetailScreen] Force save push failed: $e');
+    }
+    if (!mounted) return;
+    setState(() => _isPushingSave = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Save pushed to drive.'
+            : 'Could not push save — configure a save location first.'),
+      ),
+    );
   }
 
   Future<void> _editSaveLocation() async {
